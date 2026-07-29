@@ -1,5 +1,3 @@
-import { Prisma } from "@prisma/client"
-
 import type { CreateAdCampaignInput } from "@/features/ads/model/schemas"
 import { prisma } from "@/shared/lib/db/prisma"
 
@@ -35,169 +33,105 @@ export type AdCampaign = {
   owner: AdCampaignOwner
 }
 
-type AdCampaignRow = {
-  id: number
-  owner_id: number
-  title: string
-  description: string
-  cta_text: string
-  target_url: string
-  audience: string
-  budget: number
-  status: string
-  clicks: number
-  impressions: number
-  created_at: Date
-  updated_at: Date
-  starts_at: Date | null
-  ends_at: Date | null
-  owner_first_name: string
-  owner_last_name: string | null
-  owner_email: string
-  owner_role: string
-  owner_avatar_tone: string | null
-  owner_is_blocked: boolean
+const STATUS_ORDER: Record<string, number> = { active: 0, draft: 1 }
+
+function toIso(value: unknown): string {
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === "string") return new Date(value).toISOString()
+  return new Date().toISOString()
 }
 
-function mapRow(row: AdCampaignRow): AdCampaign {
+function toIsoOrNull(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  return toIso(value)
+}
+
+function mapCampaign(row: Record<string, unknown>): AdCampaign {
+  const owner = row.owner as Record<string, unknown>
   return {
-    id: row.id,
-    ownerId: row.owner_id,
-    title: row.title,
-    description: row.description,
-    ctaText: row.cta_text,
-    targetUrl: row.target_url,
+    id: row.id as number,
+    ownerId: row.ownerId as number,
+    title: row.title as string,
+    description: row.description as string,
+    ctaText: row.ctaText as string,
+    targetUrl: row.targetUrl as string,
     audience: row.audience as AdCampaignAudience,
-    budget: row.budget,
+    budget: row.budget as number,
     status: row.status as AdCampaignStatus,
-    clicks: row.clicks,
-    impressions: row.impressions,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString(),
-    startsAt: row.starts_at ? row.starts_at.toISOString() : null,
-    endsAt: row.ends_at ? row.ends_at.toISOString() : null,
+    clicks: row.clicks as number,
+    impressions: row.impressions as number,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+    startsAt: toIsoOrNull(row.startsAt),
+    endsAt: toIsoOrNull(row.endsAt),
     owner: {
-      id: row.owner_id,
-      firstName: row.owner_first_name,
-      lastName: row.owner_last_name,
-      email: row.owner_email,
-      role: row.owner_role,
-      avatarTone: row.owner_avatar_tone,
-      isBlocked: row.owner_is_blocked,
+      id: owner.id as number,
+      firstName: owner.firstName as string,
+      lastName: (owner.lastName as string | null) ?? null,
+      email: owner.email as string,
+      role: owner.role as string,
+      avatarTone: (owner.avatarTone as string | null) ?? null,
+      isBlocked: Boolean(owner.isBlocked),
     },
   }
 }
 
-async function queryCampaigns(whereClause: Prisma.Sql = Prisma.empty) {
-  const rows = await prisma.$queryRaw<AdCampaignRow[]>(Prisma.sql`
-    select
-      a.id,
-      a.owner_id,
-      a.title,
-      a.description,
-      a.cta_text,
-      a.target_url,
-      a.audience,
-      a.budget,
-      a.status,
-      a.clicks,
-      a.impressions,
-      a.created_at,
-      a.updated_at,
-      a.starts_at,
-      a.ends_at,
-      u.first_name as owner_first_name,
-      u.last_name as owner_last_name,
-      u.email as owner_email,
-      u.role as owner_role,
-      u.avatar_tone as owner_avatar_tone,
-      u.is_blocked as owner_is_blocked
-    from ad_campaigns a
-    join users u on u.id = a.owner_id
-    ${whereClause}
-    order by
-      case when a.status = 'active' then 0 when a.status = 'draft' then 1 else 2 end,
-      a.created_at desc
-  `)
+function sortCampaigns(rows: AdCampaign[]): AdCampaign[] {
+  return rows.slice().sort((a, b) => {
+    const aOrder = STATUS_ORDER[a.status] ?? 2
+    const bOrder = STATUS_ORDER[b.status] ?? 2
+    if (aOrder !== bOrder) return aOrder - bOrder
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
 
-  return rows.map(mapRow)
+async function queryCampaigns(where: Record<string, unknown>) {
+  const rows = await prisma.adCampaign.findMany({
+    where,
+    include: {
+      owner: {
+        select: { id: true, firstName: true, lastName: true, email: true, role: true, avatarTone: true, isBlocked: true },
+      },
+    },
+  })
+
+  return sortCampaigns(rows.map(mapCampaign))
 }
 
 export async function listPublicAdCampaigns() {
-  return queryCampaigns(Prisma.sql`where a.status = 'active'`)
+  return queryCampaigns({ status: "active" })
 }
 
 export async function listAdCampaignsByOwner(ownerId: number) {
-  return queryCampaigns(Prisma.sql`where a.owner_id = ${ownerId}`)
+  return queryCampaigns({ ownerId })
 }
 
 export async function createAdCampaign(ownerId: number, input: CreateAdCampaignInput) {
-  const rows = await prisma.$queryRaw<AdCampaignRow[]>(Prisma.sql`
-    insert into ad_campaigns (
-      owner_id,
-      title,
-      description,
-      cta_text,
-      target_url,
-      audience,
-      budget,
-      status,
-      clicks,
-      impressions
-    )
-    values (
-      ${ownerId},
-      ${input.title},
-      ${input.description},
-      ${input.ctaText},
-      ${input.targetUrl},
-      ${input.audience},
-      ${input.budget},
-      'draft',
-      0,
-      0
-    )
-    returning
-      id,
-      owner_id,
-      title,
-      description,
-      cta_text,
-      target_url,
-      audience,
-      budget,
-      status,
-      clicks,
-      impressions,
-      created_at,
-      updated_at,
-      starts_at,
-      ends_at,
-      ${""}::varchar as owner_first_name,
-      null::varchar as owner_last_name,
-      ${""}::varchar as owner_email,
-      ${""}::varchar as owner_role,
-      null::varchar as owner_avatar_tone,
-      false as owner_is_blocked
-  `)
+  const created = await prisma.adCampaign.create({
+    data: {
+      ownerId,
+      title: input.title,
+      description: input.description,
+      ctaText: input.ctaText,
+      targetUrl: input.targetUrl,
+      audience: input.audience,
+      budget: input.budget,
+      status: "draft",
+      clicks: 0,
+      impressions: 0,
+    },
+    include: {
+      owner: {
+        select: { id: true, firstName: true, lastName: true, email: true, role: true, avatarTone: true, isBlocked: true },
+      },
+    },
+  })
 
-  const createdId = rows[0]?.id
-  if (!createdId) {
-    throw new Error("Не удалось создать рекламную кампанию")
-  }
-
-  const [campaign] = await queryCampaigns(Prisma.sql`where a.id = ${createdId}`)
-  if (!campaign) {
-    throw new Error("Не удалось загрузить рекламную кампанию")
-  }
-
-  return campaign
+  return mapCampaign(created)
 }
 
 export async function getOwnedAdCampaign(adId: number, ownerId: number) {
-  const [campaign] = await queryCampaigns(
-    Prisma.sql`where a.id = ${adId} and a.owner_id = ${ownerId}`
-  )
+  const [campaign] = await queryCampaigns({ id: adId, ownerId })
   return campaign ?? null
 }
 
@@ -206,31 +140,36 @@ export async function updateAdCampaignStatus(
   ownerId: number,
   status: AdCampaignStatus
 ) {
-  await prisma.$executeRaw(Prisma.sql`
-    update ad_campaigns
-    set
-      status = ${status},
-      starts_at = case when ${status} = 'active' then now() else starts_at end,
-      updated_at = now()
-    where id = ${adId} and owner_id = ${ownerId}
-  `)
+  const existing = await prisma.adCampaign.findFirst({ where: { id: adId, ownerId } })
+  if (!existing) {
+    return getOwnedAdCampaign(adId, ownerId)
+  }
+
+  await prisma.adCampaign.updateMany({
+    where: { id: adId, ownerId },
+    data: {
+      status,
+      startsAt: status === "active" ? new Date() : existing.startsAt,
+      updatedAt: new Date(),
+    },
+  })
 
   return getOwnedAdCampaign(adId, ownerId)
 }
 
 export async function deleteAdCampaign(adId: number, ownerId: number) {
-  await prisma.$executeRaw(Prisma.sql`
-    delete from ad_campaigns
-    where id = ${adId} and owner_id = ${ownerId}
-  `)
+  await prisma.adCampaign.deleteMany({ where: { id: adId, ownerId } })
 }
 
 export async function recordAdCampaignClick(adId: number) {
-  await prisma.$executeRaw(Prisma.sql`
-    update ad_campaigns
-    set
-      clicks = clicks + 1,
-      updated_at = now()
-    where id = ${adId} and status = 'active'
-  `)
+  const existing = await prisma.adCampaign.findFirst({ where: { id: adId, status: "active" } })
+  if (!existing) return
+
+  await prisma.adCampaign.updateMany({
+    where: { id: adId, status: "active" },
+    data: {
+      clicks: { increment: 1 },
+      updatedAt: new Date(),
+    },
+  })
 }

@@ -5,7 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react"
 
@@ -23,7 +23,6 @@ const STORAGE_KEY = "language"
 
 const RAW_EN_TRANSLATIONS: Record<string, string> = {
   "Системный язык": "System language",
-  "Игра": "Game",
   "Сервер": "Server",
   "Русский": "Russian",
   "Английский": "English",
@@ -52,7 +51,7 @@ const RAW_EN_TRANSLATIONS: Record<string, string> = {
   "Загрузка контактов...": "Loading contacts...",
   "Загрузка чатов...": "Loading chats...",
   "Авторизация": "Authorization",
-  "Войдите в существующий аккаунт или создайте новый после проверки Turnstile.": "Sign in to an existing account or create a new one after Turnstile verification.",
+  "Войдите в существующий аккаунт или создайте новый.": "Sign in to an existing account or create a new one.",
   "Вход": "Login",
   "Регистрация": "Register",
   "Пароль": "Password",
@@ -235,30 +234,7 @@ const RAW_EN_TRANSLATIONS: Record<string, string> = {
   "Снять админа": "Remove admin",
 }
 
-function decodePossiblyBrokenText(text: string) {
-  let current = text
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (!/[ÐÑРСЃ]/.test(current)) {
-      break
-    }
-
-    const bytes = Uint8Array.from(Array.from(current), (char) => char.charCodeAt(0) & 0xff)
-    const decoded = new TextDecoder("utf-8").decode(bytes)
-
-    if (decoded === current || decoded.includes("\u0000")) {
-      break
-    }
-
-    current = decoded
-  }
-
-  return current
-}
-
-const EN_TRANSLATIONS = Object.fromEntries(
-  Object.entries(RAW_EN_TRANSLATIONS).map(([key, value]) => [decodePossiblyBrokenText(key), value])
-)
+const EN_TRANSLATIONS = RAW_EN_TRANSLATIONS
 
 const defaultContextValue: I18nContextValue = {
   language: "ru",
@@ -277,27 +253,55 @@ function getSystemLanguage(): ResolvedLanguage {
   return navigator.language.toLowerCase().startsWith("ru") ? "ru" : "en"
 }
 
+// localStorage is only readable client-side, so resolving the stored preference during render
+// would make the client's first render diverge from the server-rendered HTML and fail
+// hydration. useSyncExternalStore is the React-sanctioned way to read an external, mutable
+// source safely across server and client: it renders the server snapshot ("system") on the
+// server and on the client's first pass, then swaps to the real client value right after.
+const preferenceListeners = new Set<() => void>()
+
+function readStoredPreference(): LanguagePreference {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  return stored === "ru" || stored === "en" || stored === "system" ? stored : "system"
+}
+
+function readStoredPreferenceServerSnapshot(): LanguagePreference {
+  return "system"
+}
+
+function subscribeToPreference(listener: () => void) {
+  window.addEventListener("storage", listener)
+  preferenceListeners.add(listener)
+  return () => {
+    window.removeEventListener("storage", listener)
+    preferenceListeners.delete(listener)
+  }
+}
+
+function writeStoredPreference(next: LanguagePreference) {
+  localStorage.setItem(STORAGE_KEY, next)
+  preferenceListeners.forEach((listener) => listener())
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [languagePreference, setLanguagePreference] = useState<LanguagePreference>(() => {
-    if (typeof window === "undefined") {
-      return "system"
-    }
-
-    const storedLanguage = localStorage.getItem(STORAGE_KEY)
-    return storedLanguage === "ru" || storedLanguage === "en" || storedLanguage === "system"
-      ? storedLanguage
-      : "system"
-  })
-
-  const language = languagePreference === "system" ? getSystemLanguage() : languagePreference
+  const languagePreference = useSyncExternalStore(
+    subscribeToPreference,
+    readStoredPreference,
+    readStoredPreferenceServerSnapshot
+  )
+  const systemLanguage = useSyncExternalStore(
+    () => () => undefined,
+    getSystemLanguage,
+    () => "ru" as const
+  )
+  const language = languagePreference === "system" ? systemLanguage : languagePreference
 
   useEffect(() => {
     document.documentElement.lang = language
   }, [language])
 
   const setLanguage = (nextLanguage: LanguagePreference) => {
-    localStorage.setItem(STORAGE_KEY, nextLanguage)
-    setLanguagePreference(nextLanguage)
+    writeStoredPreference(nextLanguage)
   }
 
   const value = useMemo<I18nContextValue>(
@@ -306,13 +310,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       languagePreference,
       setLanguage,
       tr: (text: string) => {
-        const normalizedText = decodePossiblyBrokenText(text)
-
         if (language === "ru") {
-          return normalizedText
+          return text
         }
 
-        return EN_TRANSLATIONS[normalizedText] ?? normalizedText
+        return EN_TRANSLATIONS[text] ?? text
       },
     }),
     [language, languagePreference]

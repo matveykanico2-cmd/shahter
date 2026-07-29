@@ -1,6 +1,5 @@
 jest.mock("@/shared/lib/db/prisma", () => ({
   prisma: {
-    $queryRawUnsafe: jest.fn(),
     user: {
       findUnique: jest.fn(),
     },
@@ -20,7 +19,7 @@ import { getCurrentUser } from "@/shared/lib/auth/current-user"
 import { getAuthorizedUserIdFromRequest } from "@/shared/lib/auth/request-user"
 
 const { prisma: mockPrisma } = jest.requireMock("@/shared/lib/db/prisma") as {
-  prisma: { $queryRawUnsafe: jest.Mock; user: { findUnique: jest.Mock } }
+  prisma: { user: { findUnique: jest.Mock } }
 }
 const { touchUserActivity: mockTouchUserActivity } = jest.requireMock(
   "@/shared/lib/user-activity"
@@ -82,59 +81,55 @@ describe("auth helpers", () => {
     await expect(getCurrentUser()).resolves.toBeNull()
 
     mockVerifyAuthToken.mockResolvedValueOnce({ sid: "sid", userId: 4 })
-    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([])
+    mockPrisma.user.findUnique.mockResolvedValueOnce(null)
     await expect(getCurrentUser()).resolves.toBeNull()
 
     mockVerifyAuthToken
       .mockResolvedValueOnce({ sid: "sid", userId: 4 })
       .mockResolvedValueOnce({ sid: "sid", userId: 4 })
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([
-        {
-          id: 4,
-          email: "user@example.com",
-          first_name: "Ivan",
-          last_name: null,
-          username: "ivan_test",
-          phone: "12345678",
-          role: "user",
-          premium_until: null,
-          stars_balance: 0,
-          partner_stars_earned: 0,
-          avatar_id: null,
-          avatar_tone: null,
-          avatar_url: null,
-          is_blocked: false,
-          last_seen_at: null,
-          profile_visibility: "everyone",
-          show_email_in_profile: true,
-          show_phone_in_profile: true,
-          show_gifts_in_profile: true,
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 4,
-          email: "user@example.com",
-          first_name: "Ivan",
-          last_name: null,
-          username: "ivan_test",
-          phone: "12345678",
-          role: "user",
-          premium_until: null,
-          stars_balance: 0,
-          partner_stars_earned: 0,
-          avatar_id: null,
-          avatar_tone: null,
-          avatar_url: null,
-          is_blocked: false,
-          last_seen_at: null,
-          profile_visibility: "everyone",
-          show_email_in_profile: true,
-          show_phone_in_profile: true,
-          show_gifts_in_profile: true,
-        },
-      ])
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: 4,
+        email: "user@example.com",
+        firstName: "Ivan",
+        lastName: null,
+        username: "ivan_test",
+        phone: "12345678",
+        role: "user",
+        premiumUntil: null,
+        starsBalance: 0,
+        partnerStarsEarned: 0,
+        avatarId: null,
+        avatarTone: null,
+        avatarUrl: null,
+        isBlocked: false,
+        lastSeenAt: null,
+        profileVisibility: "everyone",
+        showEmailInProfile: true,
+        showPhoneInProfile: true,
+        showGiftsInProfile: true,
+      })
+      .mockResolvedValueOnce({
+        id: 4,
+        email: "user@example.com",
+        firstName: "Ivan",
+        lastName: null,
+        username: "ivan_test",
+        phone: "12345678",
+        role: "user",
+        premiumUntil: null,
+        starsBalance: 0,
+        partnerStarsEarned: 0,
+        avatarId: null,
+        avatarTone: null,
+        avatarUrl: null,
+        isBlocked: false,
+        lastSeenAt: null,
+        profileVisibility: "everyone",
+        showEmailInProfile: true,
+        showPhoneInProfile: true,
+        showGiftsInProfile: true,
+      })
 
     await expect(getCurrentUser()).resolves.toMatchObject({ id: 4 })
     await expect(getCurrentUser({ touchActivity: false })).resolves.toMatchObject({ id: 4 })

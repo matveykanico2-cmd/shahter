@@ -1,7 +1,11 @@
-import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
+import { isPrismaKnownRequestError } from "@/shared/lib/db/prisma-errors"
+import type { prisma } from "@/shared/lib/db/prisma"
+
 export const USERNAME_REGEX = /^[a-z0-9_]{4,32}$/
+
+type DbClient = typeof prisma
 
 export const usernameSchema = z
   .string()
@@ -16,14 +20,11 @@ export function normalizeUsername(value: string) {
 }
 
 export function isUsernameConflictError(error: unknown) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  )
+  return isPrismaKnownRequestError(error, "P2002")
 }
 
 export async function reserveUsername(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   username: string,
   entityType: UsernameEntityType,
   entityId: number
@@ -38,7 +39,7 @@ export async function reserveUsername(
 }
 
 export async function updateReservedUsername(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   username: string,
   entityType: UsernameEntityType,
   entityId: number
@@ -73,7 +74,7 @@ export async function updateReservedUsername(
 }
 
 export async function releaseUsername(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   entityType: UsernameEntityType,
   entityId: number
 ) {

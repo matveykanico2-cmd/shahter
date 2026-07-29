@@ -1,31 +1,14 @@
-import { PrismaPg } from "@prisma/adapter-pg"
-import { PrismaClient } from "@prisma/client"
-import { Pool } from "pg"
+import { createDbClient, type AnyObj } from "./json-db/engine"
 
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
-  pgPool?: Pool
+/** Loose row shape returned by the JSON store's query engine (no generated client to derive precise types from). */
+export type DbRow = AnyObj
+
+const globalForDb = globalThis as unknown as {
+  jsonDbClient?: ReturnType<typeof createDbClient>
 }
 
-export function getPgPool() {
-  if (globalForPrisma.pgPool) {
-    return globalForPrisma.pgPool
-  }
-
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  })
-  globalForPrisma.pgPool = pool
-  return pool
-}
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter: new PrismaPg(getPgPool()),
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  })
+export const prisma = globalForDb.jsonDbClient ?? createDbClient()
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma
+  globalForDb.jsonDbClient = prisma
 }

@@ -43,13 +43,13 @@ export async function GET(
 ) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const { dialogId: dialogIdParam } = await context.params
   const dialogId = parseDialogId(dialogIdParam)
   if (!dialogId) {
-    return NextResponse.json({ message: "РќРµРІРµСЂРЅС‹Р№ id С‡Р°С‚Р°" }, { status: 400 })
+    return NextResponse.json({ message: "Неверный id чата" }, { status: 400 })
   }
 
   const hasAccess = await checkDialogAccess(dialogId, userId)
@@ -58,7 +58,7 @@ export async function GET(
     return NextResponse.json(
       {
         code: reason,
-        message: reason === "REMOVED_FROM_CHAT" ? "Р’Р°СЃ СѓРґР°Р»РёР»Рё РёР· С‡Р°С‚Р°" : "Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ",
+        message: reason === "REMOVED_FROM_CHAT" ? "Вас удалили из чата" : "Чат не найден",
       },
       { status: 404 }
     )
@@ -76,7 +76,7 @@ export async function GET(
     },
   })
 
-  const messages = await getDialogMessages(dialogId)
+  const messages = await getDialogMessages(dialogId, userId)
 
   return NextResponse.json(
     {
@@ -92,13 +92,13 @@ export async function POST(
 ) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const { dialogId: dialogIdParam } = await context.params
   const dialogId = parseDialogId(dialogIdParam)
   if (!dialogId) {
-    return NextResponse.json({ message: "РќРµРІРµСЂРЅС‹Р№ id С‡Р°С‚Р°" }, { status: 400 })
+    return NextResponse.json({ message: "Неверный id чата" }, { status: 400 })
   }
 
   const hasAccess = await checkDialogAccess(dialogId, userId)
@@ -107,7 +107,7 @@ export async function POST(
     return NextResponse.json(
       {
         code: reason,
-        message: reason === "REMOVED_FROM_CHAT" ? "Р’Р°СЃ СѓРґР°Р»РёР»Рё РёР· С‡Р°С‚Р°" : "Р§Р°С‚ РЅРµ РЅР°Р№РґРµРЅ",
+        message: reason === "REMOVED_FROM_CHAT" ? "Вас удалили из чата" : "Чат не найден",
       },
       { status: 404 }
     )
@@ -117,7 +117,7 @@ export async function POST(
   if (!writeAccess.ok && writeAccess.code === "CONTACT_REQUIRED") {
     return NextResponse.json(
       {
-        message: "Р­С‚РѕРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ РјРѕРіСѓС‚ РїРёСЃР°С‚СЊ С‚РѕР»СЊРєРѕ Р»СЋРґРё РёР· РµРіРѕ РєРѕРЅС‚Р°РєС‚РѕРІ",
+        message: "Этому пользователю могут писать только люди из его контактов",
       },
       { status: 403 }
     )
@@ -127,7 +127,7 @@ export async function POST(
   if (!parsed.success) {
     return NextResponse.json(
       {
-        message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+        message: "Ошибка валидации",
         fieldErrors: parsed.fieldErrors,
       },
       { status: 400 }
@@ -160,7 +160,7 @@ export async function POST(
     const names = blockedByUsers.map((item) => formatBlacklistUserName(item.owner)).join(", ")
     return NextResponse.json(
       {
-        message: `Р’С‹ РЅРµ РјРѕР¶РµС‚Рµ РїРёСЃР°С‚СЊ РІ СЌС‚РѕС‚ С‡Р°С‚. Р’Р°СЃ РґРѕР±Р°РІРёР»Рё РІ С‡С‘СЂРЅС‹Р№ СЃРїРёСЃРѕРє: ${names}`,
+        message: `Вы не можете писать в этот чат. Вас добавили в чёрный список: ${names}`,
       },
       { status: 403 }
     )
@@ -172,7 +172,7 @@ export async function POST(
     if (validationError) {
       return NextResponse.json(
         {
-          message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+          message: "Ошибка валидации",
           fieldErrors: {
             attachment: [validationError],
           },

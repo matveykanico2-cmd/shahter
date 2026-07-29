@@ -42,7 +42,7 @@ function buildBotUsername(name: string, explicitUsername?: string) {
 export async function POST(request: NextRequest) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const contentType = request.headers.get("content-type") ?? ""
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       {
-        message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+        message: "Ошибка валидации",
         fieldErrors: parsed.error.flatten().fieldErrors,
       },
       { status: 400 }
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (avatarError) {
       return NextResponse.json(
         {
-          message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+          message: "Ошибка валидации",
           fieldErrors: {
             avatarFile: [avatarError],
           },
@@ -152,9 +152,9 @@ export async function POST(request: NextRequest) {
       if (targets.includes("username") || targets.includes("username_registry_username_key")) {
         return NextResponse.json(
           {
-            message: "Р В­РЎвЂљР С•РЎвЂљ username Р В±Р С•РЎвЂљР В° РЎС“Р В¶Р Вµ Р В·Р В°Р Р…РЎРЏРЎвЂљ",
+            message: "Этот username бота уже занят",
             fieldErrors: {
-              username: ["Р В­РЎвЂљР С•РЎвЂљ username Р В±Р С•РЎвЂљР В° РЎС“Р В¶Р Вµ Р В·Р В°Р Р…РЎРЏРЎвЂљ"],
+              username: ["Этот username бота уже занят"],
             },
           },
           { status: 409 }

@@ -6,7 +6,7 @@ import type { BotConfig } from "@/features/bots/lib/runtime"
 import { ChatsHomeClient } from "@/features/chats/ui/chats-home-client"
 import { getCurrentUser } from "@/shared/lib/auth/current-user"
 import { findUsersWhoBlockedActor } from "@/shared/lib/blacklist"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import { canWriteToProtectedUser } from "@/shared/lib/direct-message-access"
 import { isUserOnline } from "@/shared/lib/user-activity"
 
@@ -133,7 +133,7 @@ export default async function ChatsPage({
     }
   }
 
-  const dialogs: Array<{
+  type ChatDialogRow = {
     id: number
     ownerId: number
     title: string | null
@@ -160,7 +160,9 @@ export default async function ChatsPage({
         lastName: string | null
       }
     }>
-  }> = await prisma.dialog.findMany({
+  }
+
+  const dialogs = (await prisma.dialog.findMany({
     where: {
       users: {
         some: { id: user.id },
@@ -199,7 +201,7 @@ export default async function ChatsPage({
       },
     },
     orderBy: { id: "desc" },
-  })
+  })) as ChatDialogRow[]
 
   const unreadGroups = await prisma.message.groupBy({
     by: ["dialogId"],
@@ -287,10 +289,20 @@ export default async function ChatsPage({
         initialCallMode={requestedStartCall}
         initialAnswerIncoming={requestedAnswerCall}
         initialAnswerCallId={requestedAnswerCallId}
-        contacts={contacts.map((item) => item.contactUser)}
-        channels={channels}
-        bots={bots.map((bot) => ({
-          ...bot,
+        contacts={contacts.map((item: DbRow) => item.contactUser)}
+        channels={channels.map((channel: DbRow) => ({
+          id: channel.id,
+          title: channel.title,
+          username: channel.username,
+          description: channel.description,
+          avatarUrl: channel.avatarUrl,
+        }))}
+        bots={bots.map((bot: DbRow) => ({
+          id: bot.id,
+          name: bot.name,
+          username: bot.username,
+          niche: bot.niche,
+          avatarUrl: bot.avatarUrl,
           config: bot.config as BotConfig,
         }))}
         dialogs={dialogs.map((dialog) => ({

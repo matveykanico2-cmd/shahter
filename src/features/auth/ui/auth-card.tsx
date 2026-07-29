@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useMemo, useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,6 @@ import {
   registerSchema,
 } from "@/features/auth/model/schemas"
 import { PhoneInput } from "@/features/auth/ui/phone-input"
-import { TurnstileWidget } from "@/features/auth/ui/turnstile-widget"
 import { useI18n } from "@/features/i18n/model/i18n-provider"
 
 type LoginForm = {
@@ -32,7 +31,6 @@ type RegisterForm = {
   lastName: string
   username: string
   phone: string
-  turnstileToken: string
   referrerId?: number
 }
 
@@ -69,7 +67,6 @@ export function AuthCard() {
   const [loginErrors, setLoginErrors] = useState<FieldErrors>({})
   const [registerErrors, setRegisterErrors] = useState<FieldErrors>({})
   const [recoveryErrors, setRecoveryErrors] = useState<FieldErrors>({})
-  const [turnstileResetKey, setTurnstileResetKey] = useState(0)
   const [isRecoveryConfirmOpen, setIsRecoveryConfirmOpen] = useState(false)
   const [recoveryMessage, setRecoveryMessage] = useState("")
   const [isRecoveryCodeSent, setIsRecoveryCodeSent] = useState(false)
@@ -87,7 +84,6 @@ export function AuthCard() {
     lastName: "",
     username: "",
     phone: "",
-    turnstileToken: "",
   })
 
   const [recoveryForm, setRecoveryForm] = useState<RecoveryForm>({
@@ -108,21 +104,9 @@ export function AuthCard() {
       !registerForm.confirmPassword ||
       !registerForm.firstName ||
       !registerForm.username ||
-      !registerForm.phone ||
-      !registerForm.turnstileToken,
+      !registerForm.phone,
     [isPending, registerForm]
   )
-
-  const handleTurnstileTokenChange = useCallback((token: string | null) => {
-    setRegisterErrors((prev) => ({
-      ...prev,
-      turnstileToken: undefined,
-    }))
-    setRegisterForm((prev) => ({
-      ...prev,
-      turnstileToken: token ?? "",
-    }))
-  }, [])
 
   const referrerId = useMemo(() => {
     const refValue = searchParams.get("ref")
@@ -230,7 +214,6 @@ export function AuthCard() {
       if (!response.ok) {
         setRegisterErrors((data?.fieldErrors ?? {}) as FieldErrors)
         setServerMessage(tr(data?.message ?? "Ошибка регистрации"))
-        setTurnstileResetKey((prev) => prev + 1)
         return
       }
 
@@ -246,7 +229,7 @@ export function AuthCard() {
         <CardHeader>
           <CardTitle className="text-2xl">{tr("Авторизация")}</CardTitle>
           <CardDescription>
-            {tr("Войдите в существующий аккаунт или создайте новый после проверки Turnstile.")}
+            {tr("Войдите в существующий аккаунт или создайте новый.")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -410,21 +393,6 @@ export function AuthCard() {
                   {getFieldError(registerErrors, "phone") ? (
                     <p className="text-sm text-destructive">
                       {getFieldError(registerErrors, "phone")}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">{tr("Подтверждение")}</p>
-                  <div id="register-turnstile" className="space-y-2">
-                    <TurnstileWidget
-                      resetKey={turnstileResetKey}
-                      onTokenChange={handleTurnstileTokenChange}
-                    />
-                  </div>
-                  {getFieldError(registerErrors, "turnstileToken") ? (
-                    <p className="text-sm text-destructive">
-                      {getFieldError(registerErrors, "turnstileToken")}
                     </p>
                   ) : null}
                 </div>

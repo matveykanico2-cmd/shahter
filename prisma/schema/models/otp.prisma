@@ -1,9 +1,0 @@
-model Otp {
-  id        Int    @id @default(autoincrement())
-  code      Int
-  email     String @db.VarChar(40)
-  phone     String @db.VarChar(40)
-  expiredAt Int    @map("expired_at")
-
-  @@map("otp")
-}

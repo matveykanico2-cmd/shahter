@@ -10,11 +10,6 @@ class MockPrismaClientKnownRequestError extends Error {
   }
 }
 
-jest.mock("@prisma/client", () => ({
-  Prisma: {
-    PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
-  },
-}))
 jest.mock("@/shared/lib/auth/request-user", () => ({
   getAuthorizedUserIdFromRequest: jest.fn(),
 }))

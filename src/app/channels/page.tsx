@@ -4,7 +4,7 @@ import { Providers } from "@/app/providers"
 import { PwaRegisterClient } from "@/app/pwa-register-client"
 import { ChannelsHome } from "@/features/channels/ui/channels-home"
 import { getCurrentUser } from "@/shared/lib/auth/current-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 
 export default async function ChannelsPage({
   searchParams,
@@ -124,10 +124,10 @@ export default async function ChannelsPage({
           avatarUrl: channel.avatarUrl,
           ownerId: channel.ownerId,
           myRole:
-            channel.participants.find((participant) => participant.user.id === user.id)?.role ?? null,
+            channel.participants.find((participant: DbRow) => participant.user.id === user.id)?.role ?? null,
           participants:
             channel.ownerId === user.id
-              ? channel.participants.map((participant) => ({
+              ? channel.participants.map((participant: DbRow) => ({
                   channelRole: participant.role,
                   ...participant.user,
                 }))

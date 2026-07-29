@@ -55,12 +55,6 @@ jest.mock("bcryptjs", () => ({
     compare: jest.fn(),
   },
 }))
-jest.mock("@prisma/client", () => ({
-  Prisma: {
-    PrismaClientKnownRequestError: MockPrismaClientKnownRequestError,
-  },
-}))
-
 async function loadAuthService() {
   jest.resetModules()
   const module = await import("@/features/auth/api/auth-service")

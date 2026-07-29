@@ -4,13 +4,7 @@ Release V.1.1.1
 
 ## Getting Started
 
-Start PostgreSQL first:
-
-```bash
-docker compose up -d
-```
-
-Then run the development server:
+Run the development server:
 
 ```bash
 npm run dev
@@ -24,33 +18,11 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Production notes
+## Data storage
 
-Containerized production startup runs database preparation before booting Next.js:
+The app persists all application data (users, dialogs, messages, channels, contacts, billing requests, etc.) to a single JSON file on disk instead of a database server. By default that file lives at `storage/db.json`, created automatically on first write. Set `JSON_DB_PATH` to point it elsewhere.
 
-```bash
-npm run start:prod
-```
-
-That command applies Prisma migrations and then runs the existing idempotent schema guard for `dialogs.title`.
-
-If you prefer to prepare the database as a separate deployment step, run:
-
-```bash
-npm run db:prepare
-```
-
-If Prisma reports a failed historical migration `20260402192247_fix_contact_model`, and the `contacts` table/constraints already exist in the database, mark that migration as applied once:
-
-```bash
-npm run db:migrate:resolve:fix-contact-model
-```
-
-Then rerun:
-
-```bash
-npm run db:migrate:deploy
-```
+Because everything lives on the local filesystem, the app expects to run as a single Node.js process with a persistent disk — no separate database service or container needs to be started before `npm run dev` / `npm run start`.
 
 Push notifications require VAPID keys in the server environment:
 
@@ -85,9 +57,8 @@ YOOKASSA_SECRET_KEY=...
 
 After deployment:
 
-1. Apply Prisma migrations with `npm run db:prepare` or your usual production migration step.
-2. Set the YooKassa webhook URL to `https://your-domain.example/api/billing/yookassa/webhook`.
-3. Open the profile page and start a purchase from the billing section.
+1. Set the YooKassa webhook URL to `https://your-domain.example/api/billing/yookassa/webhook`.
+2. Open the profile page and start a purchase from the billing section.
 
 The current billing flow includes:
 

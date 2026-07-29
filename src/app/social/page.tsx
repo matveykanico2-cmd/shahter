@@ -4,25 +4,12 @@ import { Providers } from "@/app/providers"
 import { PwaRegisterClient } from "@/app/pwa-register-client"
 import { SocialNetworkHome } from "@/features/social/ui/social-network-home"
 import { getCurrentUser } from "@/shared/lib/auth/current-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import type { MediaAttachment } from "@/shared/lib/media/constants"
 
-function mapAttachmentFromPost(post: {
-  mediaKind: string | null
-  mediaUrl: string | null
-  mediaName: string | null
-  mediaMime: string | null
-  mediaSize: number | null
-  attachments: Array<{
-    kind: string
-    url: string
-    name: string
-    mime: string
-    size: number
-  }>
-}): MediaAttachment[] {
+function mapAttachmentFromPost(post: DbRow): MediaAttachment[] {
   if (post.attachments.length > 0) {
-    return post.attachments.map((attachment) => ({
+    return post.attachments.map((attachment: DbRow) => ({
       kind: attachment.kind as MediaAttachment["kind"],
       url: attachment.url,
       name: attachment.name,
@@ -44,7 +31,7 @@ function mapAttachmentFromPost(post: {
   }]
 }
 
-function extractTrendingTopics(posts: Array<{ content: string }>) {
+function extractTrendingTopics(posts: DbRow[]) {
   const topicMap = new Map<string, number>()
 
   for (const post of posts) {
@@ -229,7 +216,7 @@ export default async function SocialPage() {
           attachment: mapAttachmentFromPost(post),
           likesCount: post._count.likes,
           commentsCount: post._count.comments,
-          commentsPreview: post.comments.map((comment) => ({
+          commentsPreview: post.comments.map((comment: DbRow) => ({
             id: comment.id,
             content: comment.content,
             createdAt: comment.createdAt.toISOString(),

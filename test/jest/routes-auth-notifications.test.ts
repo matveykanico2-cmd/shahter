@@ -25,9 +25,6 @@ jest.mock("@/shared/lib/notifications/push", () => ({
   removePushSubscription: jest.fn(),
   savePushSubscription: jest.fn(),
 }))
-jest.mock("@/shared/lib/turnstile", () => ({
-  verifyTurnstileToken: jest.fn(),
-}))
 jest.mock("@/shared/lib/mail", () => ({
   getMailConfigurationError: jest.fn(),
   isMailConfigured: jest.fn(),
@@ -72,9 +69,6 @@ const {
   isPushConfigured: jest.Mock
   removePushSubscription: jest.Mock
   savePushSubscription: jest.Mock
-}
-const { verifyTurnstileToken } = jest.requireMock("@/shared/lib/turnstile") as {
-  verifyTurnstileToken: jest.Mock
 }
 const { getMailConfigurationError, isMailConfigured } = jest.requireMock(
   "@/shared/lib/mail"
@@ -197,7 +191,6 @@ describe("auth and notification routes", () => {
       message: "duplicate",
       fieldErrors: { email: ["duplicate"] },
     })
-    verifyTurnstileToken.mockResolvedValueOnce({ ok: true })
     response = await POST(
       jsonRequest({
         email: "user@example.com",
@@ -207,14 +200,12 @@ describe("auth and notification routes", () => {
         lastName: "",
         username: "ivan_test",
         phone: "12345678",
-        turnstileToken: "token",
       })
     )
     expect(response.status).toBe(409)
 
     createSessionId.mockReturnValue("sid")
     createAuthToken.mockResolvedValue("token")
-    verifyTurnstileToken.mockResolvedValueOnce({ ok: true })
     registerUser.mockResolvedValueOnce({
       ok: true,
       user: { id: 7, email: "user@example.com" },
@@ -228,33 +219,12 @@ describe("auth and notification routes", () => {
         lastName: "",
         username: "ivan_test",
         phone: "12345678",
-        turnstileToken: "token",
       })
     )
     expect(response.status).toBe(201)
     expect(touchUserActivity).toHaveBeenCalledWith(7, true)
     expect(setAuthCookies).toHaveBeenCalled()
 
-    verifyTurnstileToken.mockResolvedValueOnce({
-      ok: false,
-      message: "Проверка Turnstile не пройдена",
-      errorCodes: ["invalid-input-response"],
-    })
-    response = await POST(
-      jsonRequest({
-        email: "user@example.com",
-        password: "password123",
-        confirmPassword: "password123",
-        firstName: "Ivan",
-        lastName: "",
-        username: "ivan_test",
-        phone: "12345678",
-        turnstileToken: "token",
-      })
-    )
-    expect(response.status).toBe(400)
-
-    verifyTurnstileToken.mockResolvedValueOnce({ ok: true })
     registerUser.mockRejectedValueOnce(new Error("boom"))
     response = await POST(
       jsonRequest({
@@ -265,7 +235,6 @@ describe("auth and notification routes", () => {
         lastName: "",
         username: "ivan_test",
         phone: "12345678",
-        turnstileToken: "token",
       })
     )
     expect(response.status).toBe(500)

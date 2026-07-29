@@ -620,7 +620,7 @@ export function ChannelsHome({
   }
 
   function deleteChannelFromSearch(channelId: number, channelTitle: string) {
-    const confirmed = window.confirm(`РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» В«${channelTitle}В»?`)
+    const confirmed = window.confirm(`Удалить канал «${channelTitle}»?`)
     if (!confirmed) {
       return
     }
@@ -631,7 +631,7 @@ export function ChannelsHome({
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) {
-        toast.error(tr(data?.message ?? "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РєР°РЅР°Р»"))
+        toast.error(tr(data?.message ?? "Не удалось удалить канал"))
         return
       }
 
@@ -646,7 +646,7 @@ export function ChannelsHome({
         return next
       })
       setSearchResults((prev) => prev.filter((channel) => channel.id !== channelId))
-      toast.success(tr("РљР°РЅР°Р» СѓРґР°Р»С‘РЅ"))
+      toast.success(tr("Канал удалён"))
     })
   }
 
@@ -862,7 +862,7 @@ export function ChannelsHome({
                                 disabled={isDeletingChannel}
                                 onClick={() => deleteChannelFromSearch(channel.id, channel.title)}
                               >
-                                {tr("РЈРґР°Р»РёС‚СЊ")}
+                                {tr("Удалить")}
                               </Button>
                             ) : null}
                           </div>

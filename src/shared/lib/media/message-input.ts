@@ -5,7 +5,7 @@ import { DEFAULT_MEDIA_LABELS, MEDIA_KIND_VALUES, type MediaKind } from "./const
 const contentSchema = z
   .string()
   .trim()
-  .max(1000, "РЎРѕРѕР±С‰РµРЅРёРµ СЃР»РёС€РєРѕРј РґР»РёРЅРЅРѕРµ")
+  .max(1000, "Сообщение слишком длинное")
 
 export type ParsedMessageInput = {
   content: string
@@ -43,7 +43,7 @@ export async function parseMessageInput(
     const formData = await request.formData().catch(() => null)
 
     if (!formData) {
-      return { success: false, fieldErrors: { content: ["РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ С„РѕСЂРјР°"] } }
+      return { success: false, fieldErrors: { content: ["Некорректная форма"] } }
     }
 
     const rawContent = typeof formData.get("content") === "string" ? String(formData.get("content")) : ""
@@ -64,7 +64,7 @@ export async function parseMessageInput(
 
     if (files.length === 0) {
       if (!parsedContent.data) {
-        return { success: false, fieldErrors: { content: ["Р’РІРµРґРёС‚Рµ СЃРѕРѕР±С‰РµРЅРёРµ"] } }
+        return { success: false, fieldErrors: { content: ["Введите сообщение"] } }
       }
 
       return {
@@ -77,7 +77,7 @@ export async function parseMessageInput(
     }
 
     if (files.length !== kindValues.length) {
-      return { success: false, fieldErrors: { attachment: ["РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РЅР°Р±РѕСЂ РІР»РѕР¶РµРЅРёР№"] } }
+      return { success: false, fieldErrors: { attachment: ["Некорректный набор вложений"] } }
     }
 
     const attachments: ParsedMessageInput["attachments"] = []
@@ -85,7 +85,7 @@ export async function parseMessageInput(
     for (let index = 0; index < files.length; index += 1) {
       const parsedKind = z.enum(MEDIA_KIND_VALUES).safeParse(kindValues[index])
       if (!parsedKind.success) {
-        return { success: false, fieldErrors: { attachment: ["РќРµРёР·РІРµСЃС‚РЅС‹Р№ С‚РёРї РІР»РѕР¶РµРЅРёСЏ"] } }
+        return { success: false, fieldErrors: { attachment: ["Неизвестный тип вложения"] } }
       }
 
       attachments.push({
@@ -106,7 +106,7 @@ export async function parseMessageInput(
   const json = await request.json().catch(() => null)
   const parsed = z
     .object({
-      content: contentSchema.min(1, "Р’РІРµРґРёС‚Рµ СЃРѕРѕР±С‰РµРЅРёРµ"),
+      content: contentSchema.min(1, "Введите сообщение"),
     })
     .safeParse(json)
 

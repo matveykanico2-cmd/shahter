@@ -6,7 +6,7 @@ import {
   extendPremiumUntilByDays,
   resolveRoleAfterPremiumPurchase,
 } from "@/shared/lib/billing/premium"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import { isPrismaKnownRequestError } from "@/shared/lib/db/prisma-errors"
 import { sendRecoveryCodeEmail } from "@/shared/lib/mail"
 import {
@@ -81,8 +81,8 @@ async function clearUserAccountData(userId: number) {
 
     for (const dialog of user.dialogs) {
       const remainingUserIds = dialog.users
-        .map((item) => item.id)
-        .filter((id) => id !== user.id)
+        .map((item: DbRow) => item.id)
+        .filter((id: number) => id !== user.id)
 
       if (remainingUserIds.length === 0) {
         await tx.message.deleteMany({
@@ -255,7 +255,7 @@ export async function registerUser(input: {
       })
     }
 
-    return { ok: true, user }
+    return { ok: true, user: user as { id: number; email: string } }
   } catch (error) {
     if (isPrismaKnownRequestError(error, "P2002")) {
       const targets = Array.isArray(error.meta?.target) ? error.meta.target : []

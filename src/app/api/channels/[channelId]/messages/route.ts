@@ -30,21 +30,21 @@ export async function GET(
 ) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const { channelId: rawChannelId } = await context.params
   const channelId = parseChannelId(rawChannelId)
   if (!channelId) {
-    return NextResponse.json({ message: "РќРµРІРµСЂРЅС‹Р№ id РєР°РЅР°Р»Р°" }, { status: 400 })
+    return NextResponse.json({ message: "Неверный id канала" }, { status: 400 })
   }
 
   const membership = await getMembership(channelId, userId)
   if (!membership) {
-    return NextResponse.json({ message: "РљР°РЅР°Р» РЅРµ РЅР°Р№РґРµРЅ" }, { status: 404 })
+    return NextResponse.json({ message: "Канал не найден" }, { status: 404 })
   }
 
-  const messages = await getChannelMessages(channelId)
+  const messages = await getChannelMessages(channelId, userId)
 
   return NextResponse.json(
     {
@@ -60,25 +60,25 @@ export async function POST(
 ) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const { channelId: rawChannelId } = await context.params
   const channelId = parseChannelId(rawChannelId)
   if (!channelId) {
-    return NextResponse.json({ message: "РќРµРІРµСЂРЅС‹Р№ id РєР°РЅР°Р»Р°" }, { status: 400 })
+    return NextResponse.json({ message: "Неверный id канала" }, { status: 400 })
   }
 
   const membership = await getMembership(channelId, userId)
   if (!membership) {
-    return NextResponse.json({ message: "РљР°РЅР°Р» РЅРµ РЅР°Р№РґРµРЅ" }, { status: 404 })
+    return NextResponse.json({ message: "Канал не найден" }, { status: 404 })
   }
 
   const activeBroadcast = getActiveBroadcastForChannel(channelId)
 
   if (membership.role === "MEMBER" && !activeBroadcast) {
     return NextResponse.json(
-      { message: "РџРёСЃР°С‚СЊ РІ РєР°РЅР°Р» РјРѕРіСѓС‚ С‚РѕР»СЊРєРѕ РІР»Р°РґРµР»РµС† Рё Р°РґРјРёРЅС‹" },
+      { message: "Писать в канал могут только владелец и админы" },
       { status: 403 }
     )
   }
@@ -87,7 +87,7 @@ export async function POST(
   if (!parsed.success) {
     return NextResponse.json(
       {
-        message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+        message: "Ошибка валидации",
         fieldErrors: parsed.fieldErrors,
       },
       { status: 400 }
@@ -100,7 +100,7 @@ export async function POST(
     if (validationError) {
       return NextResponse.json(
         {
-          message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+          message: "Ошибка валидации",
           fieldErrors: {
             attachment: [validationError],
           },

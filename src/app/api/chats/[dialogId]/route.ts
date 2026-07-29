@@ -1,16 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { getAuthorizedUserIdFromRequest } from "@/shared/lib/auth/request-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 
 function parseDialogId(value: string) {
   const dialogId = Number(value)
   return Number.isInteger(dialogId) && dialogId > 0 ? dialogId : null
 }
 
-function canDeleteDialog(dialog: { ownerId: number; users: Array<{ id: number }> }, userId: number) {
+function canDeleteDialog(dialog: DbRow, userId: number) {
   if (dialog.users.length === 2) {
-    return dialog.users.some((user) => user.id === userId)
+    return dialog.users.some((user: DbRow) => user.id === userId)
   }
 
   return dialog.ownerId === userId

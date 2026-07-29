@@ -42,7 +42,19 @@ export async function getAuthorizedCallContext(request: NextRequest) {
   }
 }
 
-export async function getDialogUsersForCalls(dialogId: number) {
+type DialogUsersForCalls = {
+  id: number
+  users: Array<{
+    id: number
+    firstName: string
+    lastName: string | null
+    email: string
+    avatarTone: string | null
+    avatarUrl: string | null
+  }>
+} | null
+
+export async function getDialogUsersForCalls(dialogId: number): Promise<DialogUsersForCalls> {
   return prisma.dialog.findUnique({
     where: { id: dialogId },
     select: {
@@ -58,5 +70,5 @@ export async function getDialogUsersForCalls(dialogId: number) {
         },
       },
     },
-  })
+  }) as Promise<DialogUsersForCalls>
 }

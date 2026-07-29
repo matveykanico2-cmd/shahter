@@ -12,7 +12,30 @@ function parseChannelId(value: string) {
   return Number.isInteger(channelId) && channelId > 0 ? channelId : null
 }
 
-async function getOwnerMembership(channelId: number, userId: number) {
+type OwnerMembershipChannel = {
+  id: number
+  ownerId: number
+  participants: Array<{
+    userId: number
+    role: string
+    user: {
+      id: number
+      firstName: string
+      lastName: string | null
+      email: string
+      phone: string
+      role: string
+      avatarTone: string | null
+      avatarUrl: string | null
+      isBlocked: boolean
+    }
+  }>
+} | null
+
+async function getOwnerMembership(
+  channelId: number,
+  userId: number
+): Promise<OwnerMembershipChannel> {
   const channel = await prisma.channel.findFirst({
     where: {
       id: channelId,
@@ -52,7 +75,7 @@ async function getOwnerMembership(channelId: number, userId: number) {
     return null
   }
 
-  return channel
+  return channel as unknown as Exclude<OwnerMembershipChannel, null>
 }
 
 export async function POST(

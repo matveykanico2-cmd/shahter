@@ -1,5 +1,5 @@
 import { hasAdministrativeAccess } from "@/shared/lib/auth/roles"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 
 type ProfileGift = {
   id: number
@@ -147,7 +147,7 @@ export async function getViewedContactProfile(viewerUserId: number, contactUserI
       partnerStarsEarned: user.partnerStarsEarned,
       createdAt: user.createdAt.toISOString(),
       giftsVisible: canSeeGifts,
-      gifts: (canSeeGifts ? user.receivedGiftTransactions : []).map((gift) => ({
+      gifts: (canSeeGifts ? user.receivedGiftTransactions : []).map((gift: DbRow) => ({
         id: gift.id,
         giftKey: gift.giftKey,
         giftName: gift.giftName,

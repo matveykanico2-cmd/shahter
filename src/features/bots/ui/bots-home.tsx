@@ -458,7 +458,7 @@ export function BotsHome({
       .then(async (response) => {
         const data = await response.json().catch(() => null)
         if (!response.ok) {
-          toast.error(data?.message ?? "РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ Р±РѕС‚Р°")
+          toast.error(data?.message ?? "Не удалось обновить бота")
           return
         }
 
@@ -467,7 +467,7 @@ export function BotsHome({
         toast.success(options.successMessage)
       })
       .catch(() => {
-        toast.error("РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ Р±РѕС‚Р°")
+        toast.error("Не удалось обновить бота")
       })
       .finally(() => {
         setIsUpdatingId(null)
@@ -606,7 +606,7 @@ export function BotsHome({
                   </div>
 
                   <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/20 p-3">
-                    <p className="text-sm font-medium">РђРІР°С‚Р°СЂ Р±РѕС‚Р°</p>
+                    <p className="text-sm font-medium">Аватар бота</p>
                     <div className="flex items-center gap-3">
                       <BotAvatar
                         alt={previewConfig.name}
@@ -622,12 +622,12 @@ export function BotsHome({
                         />
                         <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-2 text-sm hover:bg-accent">
                           <FileImageIcon className="size-4" />
-                          {publishAvatarFile ? "РЎРјРµРЅРёС‚СЊ Р°РІР°С‚Р°СЂ" : "Р—Р°РіСЂСѓР·РёС‚СЊ Р°РІР°С‚Р°СЂ"}
+                          {publishAvatarFile ? "Сменить аватар" : "Загрузить аватар"}
                         </span>
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {publishAvatarFile ? publishAvatarFile.name : "PNG, JPG, WEBP РёР»Рё GIF"}
+                      {publishAvatarFile ? publishAvatarFile.name : "PNG, JPG, WEBP или GIF"}
                     </p>
                   </div>
 
@@ -915,7 +915,7 @@ export function BotsHome({
                               <div>
                                 <p className="text-sm font-medium">{selectedBot.name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {selectedBot.isBlocked ? "Р‘РѕС‚ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ" : "Р‘РѕС‚ Р°РєС‚РёРІРµРЅ"}
+                                  {selectedBot.isBlocked ? "Бот заблокирован" : "Бот активен"}
                                 </p>
                               </div>
                             </div>
@@ -928,7 +928,7 @@ export function BotsHome({
                                 onClick={() => triggerAvatarUpload(selectedBot.id)}
                               >
                                 <FileImageIcon className="size-4" />
-                                {selectedBot.avatarUrl ? "РЎРјРµРЅРёС‚СЊ Р°РІР°С‚Р°СЂ" : "Р”РѕР±Р°РІРёС‚СЊ Р°РІР°С‚Р°СЂ"}
+                                {selectedBot.avatarUrl ? "Сменить аватар" : "Добавить аватар"}
                               </Button>
                               <Button
                                 type="button"
@@ -938,12 +938,12 @@ export function BotsHome({
                                 onClick={() =>
                                   updatePublication(selectedBot.id, {
                                     isBlocked: !selectedBot.isBlocked,
-                                    successMessage: selectedBot.isBlocked ? "Р‘РѕС‚ СЂР°Р·Р±Р»РѕРєРёСЂРѕРІР°РЅ" : "Р‘РѕС‚ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ",
+                                    successMessage: selectedBot.isBlocked ? "Бот разблокирован" : "Бот заблокирован",
                                   })
                                 }
                               >
                                 <ShieldIcon className="size-4" />
-                                {selectedBot.isBlocked ? "Р Р°Р·Р±Р»РѕРєРёСЂРѕРІР°С‚СЊ" : "Р—Р°Р±Р»РѕРєРёСЂРѕРІР°С‚СЊ"}
+                                {selectedBot.isBlocked ? "Разблокировать" : "Заблокировать"}
                               </Button>
                               {selectedBot.avatarUrl ? (
                                 <Button
@@ -954,7 +954,7 @@ export function BotsHome({
                                   onClick={() =>
                                     updatePublication(selectedBot.id, {
                                       removeAvatar: true,
-                                      successMessage: "РђРІР°С‚Р°СЂ Р±РѕС‚Р° СѓРґР°Р»С‘РЅ",
+                                      successMessage: "Аватар бота удалён",
                                     })
                                   }
                                 >
@@ -979,7 +979,7 @@ export function BotsHome({
 
                               updatePublication(botId, {
                                 avatarFile: file,
-                                successMessage: "РђРІР°С‚Р°СЂ Р±РѕС‚Р° РѕР±РЅРѕРІР»С‘РЅ",
+                                successMessage: "Аватар бота обновлён",
                               })
                             }}
                           />

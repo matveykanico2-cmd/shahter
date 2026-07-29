@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { getAuthorizedUserIdFromRequest } from "@/shared/lib/auth/request-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 
 function parseDialogId(value: string) {
   const dialogId = Number(value)
@@ -55,12 +55,12 @@ export async function POST(
     )
   }
 
-  const currentUser = dialog.users.find((item) => item.id === userId)
+  const currentUser = dialog.users.find((item: DbRow) => item.id === userId)
   if (!currentUser) {
     return NextResponse.json({ message: "Чат не найден" }, { status: 404 })
   }
 
-  const remainingUsers = dialog.users.filter((item) => item.id !== userId)
+  const remainingUsers = dialog.users.filter((item: DbRow) => item.id !== userId)
   const nextOwnerId = dialog.ownerId === userId ? remainingUsers[0]?.id ?? dialog.ownerId : dialog.ownerId
   const userName = `${currentUser.firstName} ${currentUser.lastName ?? ""}`.trim()
 

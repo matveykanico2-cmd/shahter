@@ -129,7 +129,7 @@ export async function GET(
             return
           }
 
-          const messages = (await getDialogMessages(dialogId)).filter(
+          const messages = (await getDialogMessages(dialogId, userId)).filter(
             (message) => message.id > lastSeenId
           )
 

@@ -42,7 +42,26 @@ export async function getAuthorizedBroadcastContext(request: NextRequest) {
   }
 }
 
-export async function getChannelMembersForBroadcasts(channelId: number) {
+type ChannelMembersForBroadcasts = {
+  id: number
+  title: string
+  ownerId: number
+  participants: Array<{
+    role: string
+    user: {
+      id: number
+      firstName: string
+      lastName: string | null
+      email: string
+      avatarTone: string | null
+      avatarUrl: string | null
+    }
+  }>
+} | null
+
+export async function getChannelMembersForBroadcasts(
+  channelId: number
+): Promise<ChannelMembersForBroadcasts> {
   return prisma.channel.findUnique({
     where: { id: channelId },
     select: {
@@ -65,5 +84,5 @@ export async function getChannelMembersForBroadcasts(channelId: number) {
         },
       },
     },
-  })
+  }) as Promise<ChannelMembersForBroadcasts>
 }

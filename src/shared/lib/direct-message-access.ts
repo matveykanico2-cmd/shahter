@@ -1,4 +1,4 @@
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 
 const TECHNICAL_DEVELOPER_EMAILS = new Set(["matveykanico@gmail.com"])
 
@@ -26,7 +26,7 @@ export async function canWriteToProtectedUser(actorId: number, targetUserId: num
     return { ok: false as const, code: "USER_NOT_FOUND" as const }
   }
 
-  if (!hasIncomingMessageProtection(targetUser)) {
+  if (!hasIncomingMessageProtection(targetUser as ProtectedUser)) {
     return { ok: true as const }
   }
 
@@ -73,7 +73,7 @@ export async function canWriteToDialog(dialogId: number, actorId: number) {
     return { ok: true as const }
   }
 
-  const otherUser = dialog.users.find((user) => user.id !== actorId)
+  const otherUser = dialog.users.find((user: DbRow) => user.id !== actorId)
 
   if (!otherUser || !hasIncomingMessageProtection(otherUser)) {
     return { ok: true as const }

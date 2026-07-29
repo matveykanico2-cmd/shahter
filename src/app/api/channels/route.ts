@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 import { createChannelSchema } from "@/features/channels/model/schemas"
 import { getAuthorizedUserIdFromRequest } from "@/shared/lib/auth/request-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import { isPrismaKnownRequestError } from "@/shared/lib/db/prisma-errors"
 import {
   deleteUploadedFileByUrl,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
           description: channel.description,
           avatarUrl: channel.avatarUrl,
           ownerId: channel.ownerId,
-          participants: channel.participants.map((participant) => ({
+          participants: channel.participants.map((participant: DbRow) => ({
             channelRole: participant.role,
             ...participant.user,
           })),
@@ -163,9 +163,9 @@ export async function POST(request: NextRequest) {
       if (targets.includes("username") || targets.includes("username_registry_username_key")) {
         return NextResponse.json(
           {
-            message: "Р­С‚РѕС‚ username РєР°РЅР°Р»Р° СѓР¶Рµ Р·Р°РЅСЏС‚",
+            message: "Этот username канала уже занят",
             fieldErrors: {
-              username: ["Р­С‚РѕС‚ username РєР°РЅР°Р»Р° СѓР¶Рµ Р·Р°РЅСЏС‚"],
+              username: ["Этот username канала уже занят"],
             },
           },
           { status: 409 }

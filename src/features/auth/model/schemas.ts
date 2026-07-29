@@ -25,7 +25,7 @@ export const recoveryCodeSchema = z.object({
   code: z
     .string()
     .trim()
-    .regex(/^\d{6}$/, "РЈРєР°Р¶РёС‚Рµ 6-Р·РЅР°С‡РЅС‹Р№ РєРѕРґ"),
+    .regex(/^\d{6}$/, "Укажите 6-значный код"),
 })
 
 export const registerSchema = z
@@ -49,7 +49,6 @@ export const registerSchema = z
       .or(z.literal("")),
     username: usernameSchema,
     phone: phoneSchema,
-    turnstileToken: z.string().trim().min(1, "Подтвердите, что вы не бот"),
     referrerId: z.coerce.number().int().positive().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {

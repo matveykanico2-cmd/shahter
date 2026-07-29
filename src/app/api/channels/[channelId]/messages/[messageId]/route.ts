@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 import { sendChannelMessageSchema } from "@/features/channels/model/schemas"
 import { getAuthorizedUserIdFromRequest } from "@/shared/lib/auth/request-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import { deleteUploadedFileByUrl } from "@/shared/lib/media/uploads"
 
 function parsePositiveInt(value: string) {
@@ -129,7 +129,7 @@ export async function PATCH(
         author: updated.author,
         attachment:
           updated.attachments.length > 0
-            ? updated.attachments.map((attachment) => ({
+            ? updated.attachments.map((attachment: DbRow) => ({
                 kind: attachment.kind as "FILE" | "VOICE" | "VIDEO_NOTE",
                 url: attachment.url,
                 name: attachment.name,

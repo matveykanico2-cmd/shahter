@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { updateDialogParticipantsSchema } from "@/features/chats/model/schemas"
 import { findUsersWhoBlockedActor, formatBlacklistUserName } from "@/shared/lib/blacklist"
 import { getAuthorizedUserIdFromRequest } from "@/shared/lib/auth/request-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import { isUserOnline } from "@/shared/lib/user-activity"
 
 function parseDialogId(value: string) {
@@ -16,7 +16,7 @@ function parseTargetUserId(value: unknown) {
   return Number.isInteger(targetUserId) && targetUserId > 0 ? targetUserId : null
 }
 
-function isGroupDialog(dialog: { title?: string | null; users: Array<unknown> }) {
+function isGroupDialog(dialog: DbRow) {
   return Boolean(dialog.title?.trim()) || dialog.users.length > 2
 }
 
@@ -49,7 +49,7 @@ async function getDialogForOwner(dialogId: number, userId: number) {
   })
 }
 
-function formatUserName(user: { firstName: string; lastName: string | null }) {
+function formatUserName(user: DbRow) {
   return `${user.firstName} ${user.lastName ?? ""}`.trim()
 }
 
@@ -104,7 +104,7 @@ export async function POST(
     )
   }
 
-  const existingParticipantIds = new Set(dialog.users.map((item) => item.id))
+  const existingParticipantIds = new Set(dialog.users.map((item: DbRow) => item.id))
   const participantIds = Array.from(
     new Set(
       parsed.data.participantIds.filter(
@@ -270,7 +270,7 @@ export async function DELETE(
     )
   }
 
-  const targetUser = dialog.users.find((item) => item.id === targetUserId)
+  const targetUser = dialog.users.find((item: DbRow) => item.id === targetUserId)
   if (!targetUser) {
     return NextResponse.json({ message: "Участник не найден" }, { status: 404 })
   }

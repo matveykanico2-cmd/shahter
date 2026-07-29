@@ -9,7 +9,7 @@ import {
   setAuthCookies,
   verifyAuthToken,
 } from "@/shared/lib/auth/session"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import { isPrismaKnownRequestError } from "@/shared/lib/db/prisma-errors"
 import { deleteUploadedFileByUrl, saveAvatarFile, validateAvatarFile } from "@/shared/lib/media/uploads"
 import { touchUserActivity } from "@/shared/lib/user-activity"
@@ -29,17 +29,12 @@ function isFileLike(value: FormDataEntryValue | null): value is File {
 }
 
 async function getCurrentAvatarUrl(userId: number) {
-  const rows = await prisma.$queryRawUnsafe<Array<{ avatar_url: string | null }>>(
-    `
-      select avatar_url
-      from users
-      where id = $1
-      limit 1
-    `,
-    userId
-  )
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { avatarUrl: true },
+  })
 
-  return rows[0]?.avatar_url ?? null
+  return user?.avatarUrl ?? null
 }
 
 export async function PATCH(request: NextRequest) {
@@ -48,12 +43,12 @@ export async function PATCH(request: NextRequest) {
     const sessionId = request.cookies.get(AUTH_SESSION_COOKIE)?.value
 
     if (!token || !sessionId) {
-      return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+      return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
     }
 
     const payload = await verifyAuthToken(token)
     if (!payload || payload.sid !== sessionId) {
-      return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+      return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
     }
 
     await touchUserActivity(payload.userId)
@@ -78,7 +73,7 @@ export async function PATCH(request: NextRequest) {
       const fieldErrors = parsed.error.flatten().fieldErrors
       return NextResponse.json(
         {
-          message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+          message: "Ошибка валидации",
           fieldErrors,
         },
         { status: 400 }
@@ -91,7 +86,7 @@ export async function PATCH(request: NextRequest) {
       if (avatarError) {
         return NextResponse.json(
           {
-            message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+            message: "Ошибка валидации",
             fieldErrors: {
               avatarFile: [avatarError],
             },
@@ -145,15 +140,10 @@ export async function PATCH(request: NextRequest) {
     const avatarUrl = typeof savedAvatarUrl === "undefined" ? previousAvatarUrl : savedAvatarUrl
 
     if (typeof savedAvatarUrl !== "undefined") {
-      await prisma.$executeRawUnsafe(
-        `
-          update users
-          set avatar_url = $1
-          where id = $2
-        `,
-        savedAvatarUrl,
-        payload.userId
-      )
+      await prisma.user.update({
+        where: { id: payload.userId },
+        data: { avatarUrl: savedAvatarUrl },
+      })
       await deleteUploadedFileByUrl(previousAvatarUrl)
     }
 
@@ -183,21 +173,21 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           message: usernameConflict
-            ? "Р­С‚РѕС‚ username СѓР¶Рµ Р·Р°РЅСЏС‚"
-            : "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚",
+            ? "Этот username уже занят"
+            : "Пользователь с таким email уже существует",
           fieldErrors: usernameConflict
             ? {
-                username: ["Р­С‚РѕС‚ username СѓР¶Рµ Р·Р°РЅСЏС‚"],
+                username: ["Этот username уже занят"],
               }
             : {
-                email: ["РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚"],
+                email: ["Пользователь с таким email уже существует"],
               },
         },
         { status: 409 }
       )
     }
 
-    return NextResponse.json({ message: "Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° СЃРµСЂРІРµСЂР°" }, { status: 500 })
+    return NextResponse.json({ message: "Внутренняя ошибка сервера" }, { status: 500 })
   }
 }
 
@@ -207,12 +197,12 @@ export async function DELETE(request: NextRequest) {
     const sessionId = request.cookies.get(AUTH_SESSION_COOKIE)?.value
 
     if (!token || !sessionId) {
-      return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+      return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
     }
 
     const payload = await verifyAuthToken(token)
     if (!payload || payload.sid !== sessionId) {
-      return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+      return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
     }
 
     await touchUserActivity(payload.userId)
@@ -243,8 +233,8 @@ export async function DELETE(request: NextRequest) {
     await prisma.$transaction(async (tx) => {
       for (const dialog of user.dialogs) {
         const remainingUserIds = dialog.users
-          .map((item) => item.id)
-          .filter((id) => id !== user.id)
+          .map((item: DbRow) => item.id)
+          .filter((id: number) => id !== user.id)
 
         if (remainingUserIds.length === 0) {
           await tx.message.deleteMany({
@@ -286,6 +276,6 @@ export async function DELETE(request: NextRequest) {
     clearAuthCookies(response)
     return response
   } catch {
-    return NextResponse.json({ message: "Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° СЃРµСЂРІРµСЂР°" }, { status: 500 })
+    return NextResponse.json({ message: "Внутренняя ошибка сервера" }, { status: 500 })
   }
 }

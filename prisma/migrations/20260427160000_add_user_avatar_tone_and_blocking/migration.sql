@@ -1,3 +1,0 @@
-ALTER TABLE "users"
-ADD COLUMN "avatar_tone" VARCHAR(20),
-ADD COLUMN "is_blocked" BOOLEAN NOT NULL DEFAULT false;

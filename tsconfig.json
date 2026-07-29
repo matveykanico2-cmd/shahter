@@ -41,7 +41,6 @@
   "exclude": [
     "node_modules",
     "docs",
-    "prisma",
     "scripts",
     "storage",
     "test"

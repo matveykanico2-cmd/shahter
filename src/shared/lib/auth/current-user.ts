@@ -45,59 +45,32 @@ export async function getCurrentUser(options?: { touchActivity?: boolean }) {
     return null
   }
 
-  const rows = await prisma.$queryRawUnsafe<
-    Array<{
-      id: number
-      email: string
-      first_name: string
-      last_name: string | null
-      username: string
-      phone: string
-      role: string
-      premium_until: Date | null
-      stars_balance: number
-      partner_stars_earned: number
-      avatar_id: number | null
-      avatar_tone: string | null
-      avatar_url: string | null
-      is_blocked: boolean
-      last_seen_at: Date | null
-      profile_visibility: "everyone" | "contacts"
-      show_email_in_profile: boolean
-      show_phone_in_profile: boolean
-      show_gifts_in_profile: boolean
-    }>
-  >(
-    `
-      select
-        id,
-        email,
-        first_name,
-        last_name,
-        username,
-        phone,
-        role,
-        premium_until,
-        stars_balance,
-        partner_stars_earned,
-        avatar_id,
-        avatar_tone,
-        avatar_url,
-        is_blocked,
-        last_seen_at,
-        profile_visibility,
-        show_email_in_profile,
-        show_phone_in_profile,
-        show_gifts_in_profile
-      from users
-      where id = $1
-      limit 1
-    `,
-    payload.userId
-  )
-  const user = rows[0]
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      phone: true,
+      role: true,
+      premiumUntil: true,
+      starsBalance: true,
+      partnerStarsEarned: true,
+      avatarId: true,
+      avatarTone: true,
+      avatarUrl: true,
+      isBlocked: true,
+      lastSeenAt: true,
+      profileVisibility: true,
+      showEmailInProfile: true,
+      showPhoneInProfile: true,
+      showGiftsInProfile: true,
+    },
+  })
 
-  if (user?.is_blocked) {
+  if (user?.isBlocked) {
     return null
   }
 
@@ -112,21 +85,21 @@ export async function getCurrentUser(options?: { touchActivity?: boolean }) {
   return {
     id: user.id,
     email: user.email,
-    firstName: user.first_name,
-    lastName: user.last_name,
+    firstName: user.firstName,
+    lastName: user.lastName,
     username: user.username,
     phone: user.phone,
     role: user.role,
-    premiumUntil: user.premium_until,
-    starsBalance: user.stars_balance,
-    partnerStarsEarned: user.partner_stars_earned,
-    avatarId: user.avatar_id,
-    avatarTone: user.avatar_tone as EmblemToneId | null,
-    avatarUrl: user.avatar_url,
-    lastSeenAt: user.last_seen_at,
-    profileVisibility: user.profile_visibility,
-    showEmailInProfile: user.show_email_in_profile,
-    showPhoneInProfile: user.show_phone_in_profile,
-    showGiftsInProfile: user.show_gifts_in_profile,
+    premiumUntil: user.premiumUntil,
+    starsBalance: user.starsBalance,
+    partnerStarsEarned: user.partnerStarsEarned,
+    avatarId: user.avatarId,
+    avatarTone: user.avatarTone as EmblemToneId | null,
+    avatarUrl: user.avatarUrl,
+    lastSeenAt: user.lastSeenAt,
+    profileVisibility: user.profileVisibility,
+    showEmailInProfile: user.showEmailInProfile,
+    showPhoneInProfile: user.showPhoneInProfile,
+    showGiftsInProfile: user.showGiftsInProfile,
   }
 }

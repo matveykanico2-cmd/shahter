@@ -38,7 +38,7 @@ function mapAttachment(item: {
 export async function POST(request: NextRequest) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const contentType = request.headers.get("content-type") ?? ""
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   if (contentType.includes("multipart/form-data")) {
     const formData = await request.formData().catch(() => null)
     if (!formData) {
-      return NextResponse.json({ message: "РќРµРєРѕСЂСЂРµРєС‚РЅР°СЏ С„РѕСЂРјР°" }, { status: 400 })
+      return NextResponse.json({ message: "Некорректная форма" }, { status: 400 })
     }
 
     parsedPayload = {
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       {
-        message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+        message: "Ошибка валидации",
         fieldErrors: parsed.error.flatten().fieldErrors,
       },
       { status: 400 }
@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
   if (!parsed.data.content && attachmentFiles.length === 0) {
     return NextResponse.json(
       {
-        message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+        message: "Ошибка валидации",
         fieldErrors: {
-          content: ["Р”РѕР±Р°РІСЊС‚Рµ С‚РµРєСЃС‚ РёР»Рё РїСЂРёРєСЂРµРїРёС‚Рµ С„Р°Р№Р»"],
+          content: ["Добавьте текст или прикрепите файл"],
         },
       },
       { status: 400 }
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       if (validationError) {
         return NextResponse.json(
           {
-            message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+            message: "Ошибка валидации",
             fieldErrors: {
               attachment: [validationError],
             },

@@ -36,13 +36,13 @@ async function getOwnedPublication(publicationId: number, userId: number) {
   })
 
   if (!publication) {
-    return { error: NextResponse.json({ message: "РџСѓР±Р»РёРєР°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" }, { status: 404 }) }
+    return { error: NextResponse.json({ message: "Публикация не найдена" }, { status: 404 }) }
   }
 
   if (publication.ownerId !== userId) {
     return {
       error: NextResponse.json(
-        { message: "РњРѕР¶РЅРѕ СѓРїСЂР°РІР»СЏС‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕРёРјРё Р±РѕС‚Р°РјРё" },
+        { message: "Можно управлять только своими ботами" },
         { status: 403 }
       ),
     }
@@ -57,13 +57,13 @@ export async function PATCH(
 ) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const { botId } = await context.params
   const publicationId = Number(botId)
   if (!Number.isInteger(publicationId) || publicationId <= 0) {
-    return NextResponse.json({ message: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р±РѕС‚" }, { status: 400 })
+    return NextResponse.json({ message: "Некорректный бот" }, { status: 400 })
   }
 
   const owned = await getOwnedPublication(publicationId, userId)
@@ -88,7 +88,7 @@ export async function PATCH(
     if (avatarError) {
       return NextResponse.json(
         {
-          message: "РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё",
+          message: "Ошибка валидации",
           fieldErrors: {
             avatarFile: [avatarError],
           },
@@ -149,13 +149,13 @@ export async function DELETE(
 ) {
   const userId = await getAuthorizedUserIdFromRequest(request)
   if (!userId) {
-    return NextResponse.json({ message: "РќРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ" }, { status: 401 })
+    return NextResponse.json({ message: "Не авторизован" }, { status: 401 })
   }
 
   const { botId } = await context.params
   const publicationId = Number(botId)
   if (!Number.isInteger(publicationId) || publicationId <= 0) {
-    return NextResponse.json({ message: "РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р±РѕС‚" }, { status: 400 })
+    return NextResponse.json({ message: "Некорректный бот" }, { status: 400 })
   }
 
   const publication = await prisma.botPublication.findUnique({
@@ -164,11 +164,11 @@ export async function DELETE(
   })
 
   if (!publication) {
-    return NextResponse.json({ message: "РџСѓР±Р»РёРєР°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°" }, { status: 404 })
+    return NextResponse.json({ message: "Публикация не найдена" }, { status: 404 })
   }
 
   if (publication.ownerId !== userId) {
-    return NextResponse.json({ message: "РњРѕР¶РЅРѕ СѓРґР°Р»СЏС‚СЊ С‚РѕР»СЊРєРѕ СЃРІРѕРё РїСѓР±Р»РёРєР°С†РёРё" }, { status: 403 })
+    return NextResponse.json({ message: "Можно удалять только свои публикации" }, { status: 403 })
   }
 
   if (typeof prisma.$transaction === "function") {

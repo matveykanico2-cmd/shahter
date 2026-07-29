@@ -5,25 +5,12 @@ import { PwaRegisterClient } from "@/app/pwa-register-client"
 import { listAdCampaignsByOwner, listPublicAdCampaigns } from "@/features/ads/lib/store"
 import { FeedHome } from "@/features/feed/ui/feed-home"
 import { getCurrentUser } from "@/shared/lib/auth/current-user"
-import { prisma } from "@/shared/lib/db/prisma"
+import { prisma, type DbRow } from "@/shared/lib/db/prisma"
 import type { MediaAttachment } from "@/shared/lib/media/constants"
 
-function mapAttachmentFromPost(post: {
-  mediaKind: string | null
-  mediaUrl: string | null
-  mediaName: string | null
-  mediaMime: string | null
-  mediaSize: number | null
-  attachments: Array<{
-    kind: string
-    url: string
-    name: string
-    mime: string
-    size: number
-  }>
-}): MediaAttachment[] {
+function mapAttachmentFromPost(post: DbRow): MediaAttachment[] {
   if (post.attachments.length > 0) {
-    return post.attachments.map((attachment) => ({
+    return post.attachments.map((attachment: DbRow) => ({
       kind: attachment.kind as MediaAttachment["kind"],
       url: attachment.url,
       name: attachment.name,
@@ -125,7 +112,7 @@ export default async function FeedPage() {
           attachment: mapAttachmentFromPost(post),
           likesCount: post._count.likes,
           likedByMe: post.likes.length > 0,
-          comments: post.comments.map((comment) => ({
+          comments: post.comments.map((comment: DbRow) => ({
             id: comment.id,
             content: comment.content,
             createdAt: comment.createdAt.toISOString(),

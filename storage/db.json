@@ -1,0 +1,150 @@
+{
+  "users": [
+    {
+      "id": 3,
+      "email": "matveykanico2@gmail.com",
+      "passwordHash": "$2b$12$Z9OrsPIwhIbDeX0m4vulkuR9Hd.cvtSR0tCSOkcKPEWjCtwo297VC",
+      "firstName": "matvey",
+      "lastName": null,
+      "username": "matvey",
+      "phone": "+79781827502",
+      "role": "user",
+      "referredById": null,
+      "updatedAt": "2026-07-29T05:23:50.720Z",
+      "starsBalance": 0,
+      "partnerStarsEarned": 0,
+      "isBlocked": false,
+      "profileVisibility": "everyone",
+      "showEmailInProfile": true,
+      "showPhoneInProfile": true,
+      "showGiftsInProfile": true,
+      "createdAt": "2026-07-29T05:23:50.720Z",
+      "lastSeenAt": "2026-07-29T06:09:16.470Z"
+    },
+    {
+      "id": 5,
+      "email": "matveykanico@gmail.com",
+      "passwordHash": "$2b$12$3EsUY2Epn9hsNcQB5aIa.OH/aPR2eBtUedAvyPCLb8jkND4/kxvtG",
+      "firstName": "matvey",
+      "lastName": null,
+      "username": "swsfd",
+      "phone": "+1 900 564545",
+      "role": "user",
+      "referredById": null,
+      "updatedAt": "2026-07-29T05:25:49.086Z",
+      "starsBalance": 0,
+      "partnerStarsEarned": 0,
+      "isBlocked": false,
+      "profileVisibility": "everyone",
+      "showEmailInProfile": true,
+      "showPhoneInProfile": true,
+      "showGiftsInProfile": true,
+      "createdAt": "2026-07-29T05:25:49.086Z",
+      "lastSeenAt": "2026-07-29T06:25:40.883Z"
+    }
+  ],
+  "dialogs": [],
+  "messages": [],
+  "messageAttachments": [],
+  "contacts": [
+    {
+      "id": 2,
+      "ownerId": 3,
+      "contactUserId": 5
+    }
+  ],
+  "dialogBlockedUsers": [],
+  "channels": [],
+  "channelParticipants": [],
+  "channelMessages": [],
+  "channelMessageAttachments": [],
+  "newsPosts": [
+    {
+      "id": 1,
+      "authorId": 5,
+      "content": "",
+      "mediaKind": "FILE",
+      "mediaUrl": "/api/uploads/messages/files/1785305091954-05c13bb3-5980-4027-a5fb-42937143b0e7-2026-07-29-06-57-46.png",
+      "mediaName": "Снимок экрана от 2026-07-29 06-57-46.png",
+      "mediaMime": "image/png",
+      "mediaSize": 281651,
+      "createdAt": "2026-07-29T06:04:51.955Z",
+      "updatedAt": "2026-07-29T06:04:51.955Z"
+    }
+  ],
+  "newsPostLikes": [],
+  "newsPostComments": [],
+  "newsPostAttachments": [
+    {
+      "id": 1,
+      "kind": "FILE",
+      "url": "/api/uploads/messages/files/1785305091954-05c13bb3-5980-4027-a5fb-42937143b0e7-2026-07-29-06-57-46.png",
+      "name": "Снимок экрана от 2026-07-29 06-57-46.png",
+      "mime": "image/png",
+      "size": 281651,
+      "position": 0,
+      "postId": 1,
+      "createdAt": "2026-07-29T06:04:51.956Z"
+    }
+  ],
+  "userBlacklist": [
+    {
+      "id": 1,
+      "ownerId": 5,
+      "blockedUserId": 3,
+      "createdAt": "2026-07-29T05:58:29.790Z"
+    }
+  ],
+  "otps": [],
+  "purchaseRequests": [],
+  "pushSubscriptions": [
+    {
+      "id": 1,
+      "userId": 5,
+      "endpoint": "https://updates.push.services.mozilla.com/wpush/v2/gAAAAABqaZTKg43nySHL2kaLvOncKjFO8QovkbgfEs5wCQ3SDxoJ4L3YRWgj3Zs6qF7uMryu6MQZ1ulZCm0OOZT9KT9F4val8GVgWzHKaXfBKKtjL-p44kaNnSMZ1eWSPSCknCZHR1wHP_qFO4qTLia2hMdqyR6FB2Wr8oOExhwDkvIf-VSJIr4",
+      "p256dh": "BC11TcDk3koFHJ8Q5XJD9u9ljA_aKiDoB1ojT1CxaJsAndX6qLB8rBOYNWKYi02k2vORamXh9Pnzta8MGNEwWWg",
+      "auth": "qMr8O2s5KDnbDLYS1r579A",
+      "expirationTime": null,
+      "createdAt": "2026-07-29T05:51:06.571Z",
+      "updatedAt": "2026-07-29T05:51:06.571Z"
+    },
+    {
+      "id": 2,
+      "userId": 3,
+      "endpoint": "https://updates.push.services.mozilla.com/wpush/v2/gAAAAABqaZXAMiTYiQ6owLhGBJQ8t9s7Ga5r_7iqdhomQ4uPLFKHyFAFEMXa4p0gySC8uLL0wMywLbqcH_udr4XDBYDPLIClqViOUj-0AOTHQJNd0Q7mBBodd789k_sZs6wdnasOHKIWvMLEnFzGkRiCpYdPWgD_X_D4dqjeADK4KVYH63O9XLg",
+      "p256dh": "BI1d8TEmrUvCPBFiftam8JOAy1ezM7tazq027XYFT8OrpxHrdfHbo8DGLP2gT33iEGmsTFN-0JeiNIoAMG8s_cc",
+      "auth": "hitsdJiYUjJiOXRhbf2Z4w",
+      "expirationTime": null,
+      "createdAt": "2026-07-29T05:55:13.240Z",
+      "updatedAt": "2026-07-29T05:55:13.240Z"
+    }
+  ],
+  "starTransactions": [],
+  "giftTransactions": [],
+  "adCampaigns": [],
+  "botPublications": [],
+  "usernameRegistry": [
+    {
+      "id": 3,
+      "username": "test_channel_1",
+      "entityType": "channel",
+      "entityId": 1,
+      "createdAt": "2026-07-29T05:21:34.152Z"
+    },
+    {
+      "id": 4,
+      "username": "matvey",
+      "entityType": "user",
+      "entityId": 3,
+      "createdAt": "2026-07-29T05:23:50.722Z"
+    },
+    {
+      "id": 6,
+      "username": "swsfd",
+      "entityType": "user",
+      "entityId": 5,
+      "createdAt": "2026-07-29T05:25:49.088Z"
+    }
+  ],
+  "dialogUsers": []
+}
