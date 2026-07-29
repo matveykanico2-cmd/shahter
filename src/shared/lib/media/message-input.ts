@@ -13,6 +13,15 @@ export type ParsedMessageInput = {
     kind: MediaKind
     file: File
   }>
+  replyToMessageId: number | null
+}
+
+function parseReplyToMessageId(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null
+  }
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 function isFileLike(value: FormDataEntryValue | null): value is File {
@@ -57,6 +66,8 @@ export async function parseMessageInput(
       }
     }
 
+    const replyToMessageId = parseReplyToMessageId(formData.get("replyToMessageId"))
+
     const files = formData
       .getAll("attachments")
       .filter((item): item is File => isFileLike(item) && item.size > 0)
@@ -72,6 +83,7 @@ export async function parseMessageInput(
         data: {
           content: parsedContent.data,
           attachments: [],
+          replyToMessageId,
         },
       }
     }
@@ -99,6 +111,7 @@ export async function parseMessageInput(
       data: {
         content: parsedContent.data || DEFAULT_MEDIA_LABELS[attachments[0]?.kind ?? "FILE"],
         attachments,
+        replyToMessageId,
       },
     }
   }
@@ -107,6 +120,7 @@ export async function parseMessageInput(
   const parsed = z
     .object({
       content: contentSchema.min(1, "Введите сообщение"),
+      replyToMessageId: z.number().int().positive().nullish(),
     })
     .safeParse(json)
 
@@ -122,6 +136,7 @@ export async function parseMessageInput(
     data: {
       content: parsed.data.content,
       attachments: [],
+      replyToMessageId: parsed.data.replyToMessageId ?? null,
     },
   }
 }

@@ -115,11 +115,21 @@ export async function POST(
     })
   }
 
+  let replyToMessageId: number | null = null
+  if (parsed.data.replyToMessageId) {
+    const replyTarget = await prisma.channelMessage.findFirst({
+      where: { id: parsed.data.replyToMessageId, channelId },
+      select: { id: true },
+    })
+    replyToMessageId = replyTarget ? parsed.data.replyToMessageId : null
+  }
+
   const message = await createChannelMessage({
     channelId,
     authorId: userId,
     content: parsed.data.content,
     attachments,
+    replyToMessageId,
   })
 
   return NextResponse.json(

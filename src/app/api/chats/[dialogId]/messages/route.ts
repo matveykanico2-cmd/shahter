@@ -187,12 +187,22 @@ export async function POST(
     })
   }
 
+  let replyToMessageId: number | null = null
+  if (parsed.data.replyToMessageId) {
+    const replyTarget = await prisma.message.findFirst({
+      where: { id: parsed.data.replyToMessageId, dialogId },
+      select: { id: true },
+    })
+    replyToMessageId = replyTarget ? parsed.data.replyToMessageId : null
+  }
+
   const message = await createDialogMessage({
     content: parsed.data.content,
     status: MESSAGE_STATUS.SENT,
     dialogId,
     authorId: userId,
     attachments,
+    replyToMessageId,
   })
 
   void sendPushToDialogRecipients({

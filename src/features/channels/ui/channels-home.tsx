@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import {
   ArrowLeftIcon,
+  BarChart3Icon,
   EllipsisVerticalIcon,
   HashIcon,
   FileImageIcon,
@@ -10,6 +11,7 @@ import {
   PaperclipIcon,
   SearchIcon,
   ShieldIcon,
+  SmilePlusIcon,
   StarIcon,
   UsersIcon,
   XIcon,
@@ -71,6 +73,27 @@ type ChannelParticipant = UserShort & {
   channelRole: "OWNER" | "ADMIN" | "MEMBER"
 }
 
+type ChannelMessageReaction = {
+  emoji: string
+  count: number
+  reactedByMe: boolean
+}
+
+type ChannelPollOption = {
+  id: number
+  text: string
+  votesCount: number
+  votedByMe: boolean
+}
+
+type ChannelPoll = {
+  id: number
+  question: string
+  allowMultiple: boolean
+  totalVotes: number
+  options: ChannelPollOption[]
+}
+
 type ChannelMessage = {
   id: number
   channelId: number
@@ -84,7 +107,11 @@ type ChannelMessage = {
     avatarTone?: string | null
     avatarUrl?: string | null
   }
+  reactions?: ChannelMessageReaction[]
+  poll?: ChannelPoll | null
 }
+
+const CHANNEL_QUICK_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"]
 
 type ChannelItem = {
   id: number
@@ -163,6 +190,13 @@ export function ChannelsHome({
   const [isLeavingChannel, startLeavingChannel] = useTransition()
   const [, startEditingMessage] = useTransition()
   const [isDeletingMessage, startDeletingMessage] = useTransition()
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<number | null>(null)
+  const [votingPollId, setVotingPollId] = useState<number | null>(null)
+  const [showPollForm, setShowPollForm] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState("")
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""])
+  const [pollAllowMultiple, setPollAllowMultiple] = useState(false)
+  const [isCreatingPoll, startCreatingPoll] = useTransition()
 
   const selectedChannel = useMemo(
     () => channels.find((channel) => channel.id === selectedChannelId) ?? null,
@@ -407,6 +441,138 @@ export function ChannelsHome({
       setComposerAttachments([])
       resetAttachmentInputs()
     })
+  }
+
+  function toggleChannelReaction(message: ChannelMessage, emoji: string) {
+    if (!selectedChannelId) {
+      return
+    }
+
+    setReactionPickerMessageId(null)
+    const alreadyReacted = message.reactions?.some((item) => item.emoji === emoji && item.reactedByMe)
+    const method = alreadyReacted ? "DELETE" : "POST"
+
+    void (async () => {
+      const response = await fetch(`/api/channels/${selectedChannelId}/messages/${message.id}/reactions`, {
+        method,
+        ...(method === "POST"
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) }
+          : {}),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error(tr(data?.message ?? "Не удалось поставить реакцию"))
+        return
+      }
+
+      setMessages((prev) =>
+        prev
+          ? prev.map((item) =>
+              item.id === message.id ? { ...item, reactions: data.reactions as ChannelMessageReaction[] } : item
+            )
+          : prev
+      )
+    })()
+  }
+
+  function addPollOptionField() {
+    setPollOptions((prev) => (prev.length >= 10 ? prev : [...prev, ""]))
+  }
+
+  function updatePollOptionField(index: number, value: string) {
+    setPollOptions((prev) => prev.map((option, i) => (i === index ? value : option)))
+  }
+
+  function removePollOptionField(index: number) {
+    setPollOptions((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)))
+  }
+
+  function resetPollForm() {
+    setShowPollForm(false)
+    setPollQuestion("")
+    setPollOptions(["", ""])
+    setPollAllowMultiple(false)
+  }
+
+  function createChannelPoll() {
+    if (!selectedChannelId) {
+      return
+    }
+
+    const question = pollQuestion.trim()
+    const options = pollOptions.map((option) => option.trim()).filter(Boolean)
+    if (!question || options.length < 2) {
+      toast.error(tr("Укажите вопрос и минимум 2 варианта ответа"))
+      return
+    }
+
+    startCreatingPoll(async () => {
+      const response = await fetch(`/api/channels/${selectedChannelId}/polls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, options, allowMultiple: pollAllowMultiple }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error(tr(data?.message ?? "Не удалось создать опрос"))
+        return
+      }
+
+      const nextMessage = data.message as ChannelMessage
+      resetPollForm()
+      setMessages((prev) => (prev ? [...prev, nextMessage] : [nextMessage]))
+      setChannels((prev) =>
+        prev.map((channel) =>
+          channel.id === selectedChannelId ? { ...channel, lastMessage: nextMessage } : channel
+        )
+      )
+    })
+  }
+
+  function voteChannelPoll(message: ChannelMessage, optionId: number) {
+    if (!selectedChannelId || !message.poll) {
+      return
+    }
+
+    const poll = message.poll
+    const alreadyVoted = poll.options.find((option) => option.id === optionId)?.votedByMe
+    if (alreadyVoted && !poll.allowMultiple) {
+      return
+    }
+
+    const nextOptionIds = poll.allowMultiple
+      ? alreadyVoted
+        ? poll.options.filter((option) => option.votedByMe && option.id !== optionId).map((option) => option.id)
+        : [...poll.options.filter((option) => option.votedByMe).map((option) => option.id), optionId]
+      : [optionId]
+
+    if (nextOptionIds.length === 0) {
+      return
+    }
+
+    setVotingPollId(poll.id)
+    void (async () => {
+      const response = await fetch(`/api/channels/${selectedChannelId}/polls/${poll.id}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionIds: nextOptionIds }),
+      })
+
+      const data = await response.json().catch(() => null)
+      setVotingPollId(null)
+      if (!response.ok) {
+        toast.error(tr(data?.message ?? "Не удалось проголосовать"))
+        return
+      }
+
+      setMessages((prev) =>
+        prev
+          ? prev.map((item) => (item.id === message.id ? { ...item, poll: data.poll as ChannelPoll } : item))
+          : prev
+      )
+    })()
   }
 
   function beginEditMessage(message: ChannelMessage) {
@@ -1172,50 +1338,199 @@ export function ChannelsHome({
                             />
                           </button>
                         )}
-                        <div
-                          className={`w-fit max-w-[85%] rounded-[1.35rem] px-3.5 py-2.5 text-sm shadow-sm ${
-                            mine
-                              ? "rounded-br-md bg-primary text-primary-foreground"
-                              : "rounded-bl-md border border-white/45 bg-background/96 text-foreground dark:border-white/8"
-                          }`}
-                        >
-                          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                          <MessageAttachmentView attachment={message.attachment} compact />
-                          <p className="mt-1 text-[11px] opacity-75">
-                            {!mine && `${message.author.firstName} ${message.author.lastName ?? ""} · `}
-                            {new Date(message.createdAt).toLocaleString("ru-RU")}
-                          </p>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <div
+                            className={`w-fit max-w-full rounded-[1.35rem] px-3.5 py-2.5 text-sm shadow-sm ${
+                              mine
+                                ? "rounded-br-md bg-primary text-primary-foreground"
+                                : "rounded-bl-md border border-white/45 bg-background/96 text-foreground dark:border-white/8"
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                            <MessageAttachmentView attachment={message.attachment} compact />
+                            {message.poll ? (
+                              <div className="mt-1 space-y-2 rounded-xl border border-current/15 bg-black/5 p-2.5 dark:bg-white/8">
+                                <p className="text-sm font-medium">{message.poll.question}</p>
+                                <div className="space-y-1.5">
+                                  {message.poll.options.map((option) => {
+                                    const total = message.poll?.totalVotes ?? 0
+                                    const percent = total > 0 ? Math.round((option.votesCount / total) * 100) : 0
+                                    return (
+                                      <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => voteChannelPoll(message, option.id)}
+                                        disabled={votingPollId === message.poll?.id}
+                                        className={`relative w-full overflow-hidden rounded-lg border px-2.5 py-1.5 text-left text-xs ${
+                                          option.votedByMe ? "border-current" : "border-current/25"
+                                        }`}
+                                      >
+                                        <span
+                                          className="absolute inset-y-0 left-0 bg-current/15"
+                                          style={{ width: `${percent}%` }}
+                                        />
+                                        <span className="relative flex items-center justify-between gap-2">
+                                          <span>
+                                            {option.text}
+                                            {option.votedByMe ? " ✓" : ""}
+                                          </span>
+                                          <span className="shrink-0 opacity-70">
+                                            {option.votesCount} · {percent}%
+                                          </span>
+                                        </span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                <p className="text-[11px] opacity-70">
+                                  {message.poll.totalVotes} голосов
+                                  {message.poll.allowMultiple ? " · можно выбрать несколько" : ""}
+                                </p>
+                              </div>
+                            ) : null}
+                            <p className="mt-1 text-[11px] opacity-75">
+                              {!mine && `${message.author.firstName} ${message.author.lastName ?? ""} · `}
+                              {new Date(message.createdAt).toLocaleString("ru-RU")}
+                            </p>
+                          </div>
+                          {message.reactions && message.reactions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {message.reactions.map((reaction) => (
+                                <button
+                                  key={reaction.emoji}
+                                  type="button"
+                                  onClick={() => toggleChannelReaction(message, reaction.emoji)}
+                                  className={`rounded-full border px-2 py-0.5 text-xs ${
+                                    reaction.reactedByMe
+                                      ? "border-primary bg-primary/10"
+                                      : "border-border/60 bg-background/60"
+                                  }`}
+                                >
+                                  {reaction.emoji} {reaction.count}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
-                        {mine && canWrite ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-accent"
-                              aria-label="Действия с сообщением"
-                            >
-                              <EllipsisVerticalIcon className="size-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              {!message.attachment ? (
-                                <DropdownMenuItem onClick={() => beginEditMessage(message)}>
-                                  Редактировать
-                                </DropdownMenuItem>
-                              ) : null}
-                              <DropdownMenuItem
-                                variant="destructive"
-                                disabled={isDeletingMessage}
-                                onClick={() => deleteMessage(message.id)}
+                        <div className="relative flex shrink-0 items-start gap-1">
+                          {reactionPickerMessageId === message.id ? (
+                            <div className="absolute -top-11 right-0 z-10 flex gap-1 rounded-full border border-border/60 bg-background p-1.5 shadow-lg">
+                              {CHANNEL_QUICK_REACTION_EMOJIS.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  className="rounded-full p-1 text-base hover:bg-accent"
+                                  onClick={() => toggleChannelReaction(message, emoji)}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-accent"
+                            aria-label="Добавить реакцию"
+                            onClick={() =>
+                              setReactionPickerMessageId((prev) => (prev === message.id ? null : message.id))
+                            }
+                          >
+                            <SmilePlusIcon className="size-4" />
+                          </button>
+                          {mine && canWrite ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-accent"
+                                aria-label="Действия с сообщением"
                               >
-                                Удалить
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : null}
+                                <EllipsisVerticalIcon className="size-4" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                {!message.attachment ? (
+                                  <DropdownMenuItem onClick={() => beginEditMessage(message)}>
+                                    Редактировать
+                                  </DropdownMenuItem>
+                                ) : null}
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={isDeletingMessage}
+                                  onClick={() => deleteMessage(message.id)}
+                                >
+                                  Удалить
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : null}
+                        </div>
                       </div>
                     )
                   })}
                 </div>
 
                 <div className="sticky bottom-0 shrink-0 border-t border-white/45 bg-background/82 p-2.5 backdrop-blur-2xl dark:border-white/8 sm:p-3">
+                  {showPollForm ? (
+                    <div className="mb-2 space-y-2 rounded-2xl border border-border/60 bg-accent/20 px-3 py-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">Новый опрос</p>
+                        <button
+                          type="button"
+                          className="rounded-full p-1 text-muted-foreground hover:bg-accent"
+                          aria-label="Закрыть опрос"
+                          onClick={resetPollForm}
+                        >
+                          <XIcon className="size-4" />
+                        </button>
+                      </div>
+                      <Input
+                        value={pollQuestion}
+                        onChange={(event) => setPollQuestion(event.target.value)}
+                        placeholder="Вопрос"
+                      />
+                      <div className="space-y-1.5">
+                        {pollOptions.map((option, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Input
+                              value={option}
+                              onChange={(event) => updatePollOptionField(index, event.target.value)}
+                              placeholder={`Вариант ${index + 1}`}
+                            />
+                            {pollOptions.length > 2 ? (
+                              <button
+                                type="button"
+                                className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-accent"
+                                aria-label="Удалить вариант"
+                                onClick={() => removePollOptionField(index)}
+                              >
+                                <XIcon className="size-4" />
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={addPollOptionField}>
+                          Добавить вариант
+                        </Button>
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={pollAllowMultiple}
+                            onChange={(event) => setPollAllowMultiple(event.target.checked)}
+                          />
+                          Несколько вариантов
+                        </label>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        onClick={createChannelPoll}
+                        disabled={isCreatingPoll}
+                      >
+                        {isCreatingPoll ? "Создаём..." : "Создать опрос"}
+                      </Button>
+                    </div>
+                  ) : null}
                   {composerAttachments.length > 0 && (
                     <div className="mb-2 space-y-2 rounded-[1rem] border border-border/70 bg-card/80 px-3 py-2">
                       {composerAttachments.map((attachment, index) => (
@@ -1301,6 +1616,16 @@ export function ChannelsHome({
                       disabled={!canWrite || isSending || !selectedChannel}
                     >
                       <PaperclipIcon className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 rounded-full"
+                      onClick={() => setShowPollForm((prev) => !prev)}
+                      disabled={!canWrite || isSending || !selectedChannel}
+                    >
+                      <BarChart3Icon className="size-4" />
                     </Button>
                     <Input
                       value={messageText}

@@ -2,15 +2,19 @@
 
 import {
   ArrowLeftIcon,
+  BarChart3Icon,
   CircleIcon,
   CheckIcon,
   EllipsisVerticalIcon,
   FileImageIcon,
+  ForwardIcon,
   MicIcon,
   MusicIcon,
   PaperclipIcon,
   PhoneCallIcon,
+  ReplyIcon,
   RefreshCcwIcon,
+  SmilePlusIcon,
   StopCircleIcon,
   UserPlusIcon,
   VideoIcon,
@@ -80,6 +84,27 @@ type ContactUser = {
   isBlocked?: boolean
 }
 
+type MessageReaction = {
+  emoji: string
+  count: number
+  reactedByMe: boolean
+}
+
+type PollOption = {
+  id: number
+  text: string
+  votesCount: number
+  votedByMe: boolean
+}
+
+type MessagePoll = {
+  id: number
+  question: string
+  allowMultiple: boolean
+  totalVotes: number
+  options: PollOption[]
+}
+
 type ChatMessage = {
   id: number
   content: string
@@ -94,7 +119,13 @@ type ChatMessage = {
     avatarTone?: string | null
     avatarUrl?: string | null
   }
+  replyTo?: { id: number; content: string; author: { id: number; firstName: string; lastName: string | null } } | null
+  forwardedFrom?: { authorId: number | null; authorName: string } | null
+  reactions?: MessageReaction[]
+  poll?: MessagePoll | null
 }
+
+const QUICK_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"]
 
 type ChatDialog = {
   id: number
@@ -438,6 +469,17 @@ export function ChatsHome({
   } | null>(initialDialogId && initialCallMode ? { media: initialCallMode, nonce: 1 } : null)
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
   const [editingText, setEditingText] = useState("")
+  const [replyingToMessage, setReplyingToMessage] = useState<ChatMessage | null>(null)
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
+  const [forwardTargetDialogId, setForwardTargetDialogId] = useState<number | null>(null)
+  const [isForwarding, startForwarding] = useTransition()
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<number | null>(null)
+  const [showPollForm, setShowPollForm] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState("")
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""])
+  const [pollAllowMultiple, setPollAllowMultiple] = useState(false)
+  const [isCreatingPoll, startCreatingPoll] = useTransition()
+  const [votingPollId, setVotingPollId] = useState<number | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [selectedContactIds, setSelectedContactIds] = useState<number[]>([])
   const [newChatTitle, setNewChatTitle] = useState("")
@@ -555,6 +597,7 @@ export function ChatsHome({
   function resetComposer() {
     setMessageText("")
     setComposerAttachments([])
+    setReplyingToMessage(null)
     resetComposerInputs()
     stopTyping()
   }
@@ -1411,19 +1454,24 @@ export function ChatsHome({
       return
     }
 
+    const replyToMessageId = replyingToMessage?.id ?? null
+
     startSending(async () => {
       const body =
         composerAttachments.length > 0
           ? (() => {
               const formData = new FormData()
               formData.set("content", content)
+              if (replyToMessageId) {
+                formData.set("replyToMessageId", String(replyToMessageId))
+              }
               for (const attachment of composerAttachments) {
                 formData.append("attachmentKinds", attachment.kind)
                 formData.append("attachments", attachment.file)
               }
               return formData
             })()
-          : JSON.stringify({ content })
+          : JSON.stringify({ content, replyToMessageId })
 
       const response = await fetch(`/api/chats/${activeDialogId}/messages`, {
         method: "POST",
@@ -1537,6 +1585,175 @@ export function ChatsHome({
       setEditingMessageId(null)
       setEditingText("")
     })
+  }
+
+  function toggleReaction(message: ChatMessage, emoji: string) {
+    if (!activeDialogId) {
+      return
+    }
+
+    setReactionPickerMessageId(null)
+    const alreadyReacted = message.reactions?.some((item) => item.emoji === emoji && item.reactedByMe)
+    const method = alreadyReacted ? "DELETE" : "POST"
+
+    void (async () => {
+      const response = await fetch(`/api/chats/${activeDialogId}/messages/${message.id}/reactions`, {
+        method,
+        ...(method === "POST"
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) }
+          : {}),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error(data?.message ?? "Не удалось поставить реакцию")
+        return
+      }
+
+      setMessages((prev) =>
+        prev
+          ? prev.map((item) =>
+              item.id === message.id ? { ...item, reactions: data.reactions as MessageReaction[] } : item
+            )
+          : prev
+      )
+    })()
+  }
+
+  function forwardMessage() {
+    if (!forwardingMessage || !forwardTargetDialogId) {
+      return
+    }
+
+    startForwarding(async () => {
+      const response = await fetch(
+        `/api/chats/${forwardingMessage.dialogId}/messages/${forwardingMessage.id}/forward`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetDialogId: forwardTargetDialogId }),
+        }
+      )
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error(data?.message ?? "Не удалось переслать сообщение")
+        return
+      }
+
+      toast.success("Сообщение переслано")
+      const nextMessage = data.message as ChatMessage
+      setDialogs((prev) => withUpdatedDialogMessage(prev, nextMessage))
+      if (activeDialogId === forwardTargetDialogId) {
+        setMessages((prev) => {
+          if (!prev) return [nextMessage]
+          if (prev.some((item) => item.id === nextMessage.id)) return prev
+          return [...prev, nextMessage]
+        })
+      }
+      setForwardingMessage(null)
+      setForwardTargetDialogId(null)
+    })
+  }
+
+  function addPollOptionField() {
+    setPollOptions((prev) => (prev.length >= 10 ? prev : [...prev, ""]))
+  }
+
+  function updatePollOptionField(index: number, value: string) {
+    setPollOptions((prev) => prev.map((option, i) => (i === index ? value : option)))
+  }
+
+  function removePollOptionField(index: number) {
+    setPollOptions((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)))
+  }
+
+  function resetPollForm() {
+    setShowPollForm(false)
+    setPollQuestion("")
+    setPollOptions(["", ""])
+    setPollAllowMultiple(false)
+  }
+
+  function createPoll() {
+    if (!activeDialogId) {
+      return
+    }
+
+    const question = pollQuestion.trim()
+    const options = pollOptions.map((option) => option.trim()).filter(Boolean)
+
+    if (!question || options.length < 2) {
+      toast.error("Укажите вопрос и минимум 2 варианта ответа")
+      return
+    }
+
+    startCreatingPoll(async () => {
+      const response = await fetch(`/api/chats/${activeDialogId}/polls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, options, allowMultiple: pollAllowMultiple }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        toast.error(data?.message ?? "Не удалось создать опрос")
+        return
+      }
+
+      const nextMessage = data.message as ChatMessage
+      resetPollForm()
+      setMessages((prev) => {
+        if (!prev) return [nextMessage]
+        if (prev.some((item) => item.id === nextMessage.id)) return prev
+        return [...prev, nextMessage]
+      })
+      setDialogs((prev) => withUpdatedDialogMessage(prev, nextMessage))
+    })
+  }
+
+  function votePoll(message: ChatMessage, optionId: number) {
+    if (!activeDialogId || !message.poll) {
+      return
+    }
+
+    const poll = message.poll
+    const alreadyVoted = poll.options.find((option) => option.id === optionId)?.votedByMe
+    if (alreadyVoted && !poll.allowMultiple) {
+      return
+    }
+
+    const nextOptionIds = poll.allowMultiple
+      ? alreadyVoted
+        ? poll.options.filter((option) => option.votedByMe && option.id !== optionId).map((option) => option.id)
+        : [...poll.options.filter((option) => option.votedByMe).map((option) => option.id), optionId]
+      : [optionId]
+
+    if (nextOptionIds.length === 0) {
+      return
+    }
+
+    setVotingPollId(poll.id)
+    void (async () => {
+      const response = await fetch(`/api/chats/${activeDialogId}/polls/${poll.id}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionIds: nextOptionIds }),
+      })
+
+      const data = await response.json().catch(() => null)
+      setVotingPollId(null)
+      if (!response.ok) {
+        toast.error(data?.message ?? "Не удалось проголосовать")
+        return
+      }
+
+      setMessages((prev) =>
+        prev
+          ? prev.map((item) => (item.id === message.id ? { ...item, poll: data.poll as MessagePoll } : item))
+          : prev
+      )
+    })()
   }
 
   function removeDialog(dialogId: number) {
@@ -2584,90 +2801,213 @@ export function ChatsHome({
                                 />
                               </button>
                             ) : null}
-                            <div
-                              className={`w-fit max-w-[85%] rounded-[1.35rem] px-3.5 py-2.5 text-sm shadow-sm ${
-                                mine
-                                  ? "rounded-br-md bg-primary text-primary-foreground"
-                                  : "rounded-bl-md border border-white/45 bg-background/96 text-foreground dark:border-white/8"
-                              }`}
-                            >
-                              {isEditingMessage ? (
-                                <div className="space-y-2">
-                                  <Input
-                                    value={editingText}
-                                    onChange={(event) => setEditingText(event.target.value)}
-                                    disabled={isEditing}
-                                  />
-                                  <div className="flex flex-col gap-2 sm:flex-row">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => saveEdit(message.id)}
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <div
+                                className={`w-fit max-w-full rounded-[1.35rem] px-3.5 py-2.5 text-sm shadow-sm ${
+                                  mine
+                                    ? "rounded-br-md bg-primary text-primary-foreground"
+                                    : "rounded-bl-md border border-white/45 bg-background/96 text-foreground dark:border-white/8"
+                                }`}
+                              >
+                                {isEditingMessage ? (
+                                  <div className="space-y-2">
+                                    <Input
+                                      value={editingText}
+                                      onChange={(event) => setEditingText(event.target.value)}
                                       disabled={isEditing}
+                                    />
+                                    <div className="flex flex-col gap-2 sm:flex-row">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => saveEdit(message.id)}
+                                        disabled={isEditing}
+                                      >
+                                        {isEditing ? "Сохраняем..." : "Сохранить"}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setEditingMessageId(null)
+                                          setEditingText("")
+                                        }}
+                                      >
+                                        Отмена
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {message.forwardedFrom ? (
+                                      <p className="mb-1 flex items-center gap-1 text-[11px] font-medium opacity-75">
+                                        <ForwardIcon className="size-3" />
+                                        Переслано от {message.forwardedFrom.authorName}
+                                      </p>
+                                    ) : null}
+                                    {message.replyTo ? (
+                                      <div className="mb-1.5 rounded-lg border-l-2 border-current/40 bg-black/5 px-2 py-1 text-xs opacity-90 dark:bg-white/10">
+                                        <p className="font-medium">
+                                          {getDialogUserName(message.replyTo.author)}
+                                        </p>
+                                        <p className="truncate">{message.replyTo.content}</p>
+                                      </div>
+                                    ) : null}
+                                    {message.content ? (
+                                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                                    ) : null}
+                                    <MessageAttachmentView attachment={message.attachment} compact />
+                                    {message.poll ? (
+                                      <div className="mt-1 space-y-2 rounded-xl border border-current/15 bg-black/5 p-2.5 dark:bg-white/8">
+                                        <p className="flex items-center gap-1.5 text-sm font-medium">
+                                          <BarChart3Icon className="size-4 shrink-0" />
+                                          {message.poll.question}
+                                        </p>
+                                        <div className="space-y-1.5">
+                                          {message.poll.options.map((option) => {
+                                            const total = message.poll?.totalVotes ?? 0
+                                            const percent =
+                                              total > 0 ? Math.round((option.votesCount / total) * 100) : 0
+                                            return (
+                                              <button
+                                                key={option.id}
+                                                type="button"
+                                                onClick={() => votePoll(message, option.id)}
+                                                disabled={votingPollId === message.poll?.id}
+                                                className={`relative w-full overflow-hidden rounded-lg border px-2.5 py-1.5 text-left text-xs ${
+                                                  option.votedByMe ? "border-current" : "border-current/25"
+                                                }`}
+                                              >
+                                                <span
+                                                  className="absolute inset-y-0 left-0 bg-current/15"
+                                                  style={{ width: `${percent}%` }}
+                                                />
+                                                <span className="relative flex items-center justify-between gap-2">
+                                                  <span>
+                                                    {option.text}
+                                                    {option.votedByMe ? " ✓" : ""}
+                                                  </span>
+                                                  <span className="shrink-0 opacity-70">
+                                                    {option.votesCount} · {percent}%
+                                                  </span>
+                                                </span>
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                        <p className="text-[11px] opacity-70">
+                                          {message.poll.totalVotes} голосов
+                                          {message.poll.allowMultiple ? " · можно выбрать несколько" : ""}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                    <p className="mt-1 text-[11px] opacity-75">
+                                      {!mine ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className="hover:underline"
+                                            onClick={() => openPublicProfile(message.author.id)}
+                                          >
+                                            {getDialogUserName(message.author)}
+                                          </button>
+                                          {" · "}
+                                        </>
+                                      ) : null}
+                                      {formatTime(message.createdAt)}
+                                      {mine && (
+                                        <span className="ml-2 inline-flex align-middle">
+                                          <MessageStatusIcon status={message.status} />
+                                        </span>
+                                      )}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                              {message.reactions && message.reactions.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {message.reactions.map((reaction) => (
+                                    <button
+                                      key={reaction.emoji}
+                                      type="button"
+                                      onClick={() => toggleReaction(message, reaction.emoji)}
+                                      className={`rounded-full border px-2 py-0.5 text-xs ${
+                                        reaction.reactedByMe
+                                          ? "border-primary bg-primary/10"
+                                          : "border-border/60 bg-background/60"
+                                      }`}
                                     >
-                                      {isEditing ? "Сохраняем..." : "Сохранить"}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
+                                      {reaction.emoji} {reaction.count}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                            {!isEditingMessage && (
+                              <div className="relative flex shrink-0 items-start gap-1">
+                                {reactionPickerMessageId === message.id ? (
+                                  <div className="absolute -top-11 right-0 z-10 flex gap-1 rounded-full border border-border/60 bg-background p-1.5 shadow-lg">
+                                    {QUICK_REACTION_EMOJIS.map((emoji) => (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        className="rounded-full p-1 text-base hover:bg-accent"
+                                        onClick={() => toggleReaction(message, emoji)}
+                                      >
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-accent"
+                                  aria-label="Добавить реакцию"
+                                  onClick={() =>
+                                    setReactionPickerMessageId((prev) =>
+                                      prev === message.id ? null : message.id
+                                    )
+                                  }
+                                >
+                                  <SmilePlusIcon className="size-4" />
+                                </button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-accent"
+                                    aria-label="Действия с сообщением"
+                                  >
+                                    <EllipsisVerticalIcon className="size-4" />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-44">
+                                    <DropdownMenuItem onClick={() => setReplyingToMessage(message)}>
+                                      <ReplyIcon className="size-4" />
+                                      Ответить
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
                                       onClick={() => {
-                                        setEditingMessageId(null)
-                                        setEditingText("")
+                                        setForwardingMessage(message)
+                                        setForwardTargetDialogId(null)
                                       }}
                                     >
-                                      Отмена
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  {message.content ? (
-                                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                                  ) : null}
-                                  <MessageAttachmentView attachment={message.attachment} compact />
-                                  <p className="mt-1 text-[11px] opacity-75">
-                                    {!mine ? (
+                                      <ForwardIcon className="size-4" />
+                                      Переслать
+                                    </DropdownMenuItem>
+                                    {mine ? (
                                       <>
-                                        <button
-                                          type="button"
-                                          className="hover:underline"
-                                          onClick={() => openPublicProfile(message.author.id)}
+                                        <DropdownMenuItem onClick={() => beginEdit(message)}>
+                                          Редактировать
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          onClick={() => removeMessage(message.id)}
+                                          disabled={isDeleting}
                                         >
-                                          {getDialogUserName(message.author)}
-                                        </button>
-                                        {" · "}
+                                          Удалить
+                                        </DropdownMenuItem>
                                       </>
                                     ) : null}
-                                    {formatTime(message.createdAt)}
-                                    {mine && (
-                                      <span className="ml-2 inline-flex align-middle">
-                                        <MessageStatusIcon status={message.status} />
-                                      </span>
-                                    )}
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                            {mine && !isEditingMessage && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-accent"
-                                  aria-label="Действия с сообщением"
-                                >
-                                  <EllipsisVerticalIcon className="size-4" />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
-                                  <DropdownMenuItem onClick={() => beginEdit(message)}>
-                                    Редактировать
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    variant="destructive"
-                                    onClick={() => removeMessage(message.id)}
-                                    disabled={isDeleting}
-                                  >
-                                    Удалить
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2678,6 +3018,87 @@ export function ChatsHome({
 
                 <div className="sticky bottom-0 shrink-0 border-t border-border/70 bg-background/88 p-3 backdrop-blur-xl">
                   <div className="space-y-2 rounded-[1.85rem] border border-white/45 bg-card/92 p-2.5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.65)] dark:border-white/8">
+                    {replyingToMessage ? (
+                      <div className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-accent/40 px-3 py-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground">
+                            Ответ {getDialogUserName(replyingToMessage.author)}
+                          </p>
+                          <p className="truncate text-muted-foreground">{replyingToMessage.content}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-accent"
+                          aria-label="Отменить ответ"
+                          onClick={() => setReplyingToMessage(null)}
+                        >
+                          <XIcon className="size-4" />
+                        </button>
+                      </div>
+                    ) : null}
+                    {showPollForm ? (
+                      <div className="space-y-2 rounded-2xl border border-border/60 bg-accent/20 px-3 py-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">Новый опрос</p>
+                          <button
+                            type="button"
+                            className="rounded-full p-1 text-muted-foreground hover:bg-accent"
+                            aria-label="Закрыть опрос"
+                            onClick={resetPollForm}
+                          >
+                            <XIcon className="size-4" />
+                          </button>
+                        </div>
+                        <Input
+                          value={pollQuestion}
+                          onChange={(event) => setPollQuestion(event.target.value)}
+                          placeholder="Вопрос"
+                        />
+                        <div className="space-y-1.5">
+                          {pollOptions.map((option, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <Input
+                                value={option}
+                                onChange={(event) => updatePollOptionField(index, event.target.value)}
+                                placeholder={`Вариант ${index + 1}`}
+                              />
+                              {pollOptions.length > 2 ? (
+                                <button
+                                  type="button"
+                                  className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-accent"
+                                  aria-label="Удалить вариант"
+                                  onClick={() => removePollOptionField(index)}
+                                >
+                                  <XIcon className="size-4" />
+                                </button>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={addPollOptionField}>
+                            Добавить вариант
+                          </Button>
+                          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={pollAllowMultiple}
+                              onChange={(event) => setPollAllowMultiple(event.target.checked)}
+                            />
+                            Несколько вариантов
+                          </label>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full"
+                          onClick={createPoll}
+                          disabled={isCreatingPoll}
+                        >
+                          {isCreatingPoll ? "Создаём..." : "Создать опрос"}
+                        </Button>
+                      </div>
+                    ) : null}
                     {isRecordingVoice || isRecordingVideoNote ? (
                       <div className="space-y-3 rounded-2xl border border-red-500/30 bg-red-500/8 px-3 py-3 text-sm">
                         <div className="flex items-center justify-between gap-3">
@@ -2843,6 +3264,16 @@ export function ChatsHome({
                       >
                         <CircleIcon className="size-4" />
                       </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setShowPollForm((prev) => !prev)}
+                        disabled={!activeDialogId || Boolean(selectedBot) || isSending}
+                        aria-label="Создать опрос"
+                      >
+                        <BarChart3Icon className="size-4" />
+                      </Button>
                       <Input
                         value={messageText}
                         onChange={(event) => setMessageText(event.target.value)}
@@ -2930,6 +3361,57 @@ export function ChatsHome({
           setEditingText("")
         }}
       />
+
+      {forwardingMessage ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold">Переслать сообщение</h3>
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{forwardingMessage.content}</p>
+
+            <div className="mt-4 max-h-64 space-y-1 overflow-y-auto">
+              {dialogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Нет доступных чатов.</p>
+              ) : (
+                dialogs.map((dialog) => (
+                  <button
+                    key={dialog.id}
+                    type="button"
+                    onClick={() => setForwardTargetDialogId(dialog.id)}
+                    className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm ${
+                      forwardTargetDialogId === dialog.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border/60 hover:bg-accent"
+                    }`}
+                  >
+                    {getDialogDisplayTitle(dialog, user.id)}
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setForwardingMessage(null)
+                  setForwardTargetDialogId(null)
+                }}
+                disabled={isForwarding}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                onClick={forwardMessage}
+                disabled={isForwarding || !forwardTargetDialogId}
+              >
+                {isForwarding ? "Пересылаем..." : "Переслать"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
